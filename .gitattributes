@@ -1,0 +1,13 @@
+# Normalize text to LF in the repo (cross-platform: Pi/container/Windows).
+# Critical for shell scripts — a CRLF-mangled .sh won't run on the Pi.
+* text=auto eol=lf
+*.sh text eol=lf
+
+# Treat binaries as-is.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.msi binary
+*.exe binary
