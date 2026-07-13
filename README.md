@@ -55,10 +55,10 @@ The daemon needs `rigctld` running for freq/mode. For the K4D (Hamlib model
 
 ```bash
 # Terminal 1 — bridge the K4 to rigctld
-"C:\Program Files\hamlib-w64-4.7.2\bin\rigctld.exe" -m 2047 -r <LAN_IP>:9200 -t 4532
+"C:\Program Files\hamlib-w64-4.7.2\bin\rigctld.exe" -m 2047 -r <K4_IP>:9200 -t 4532
 
 # Terminal 2 — the virtual radio
-cd "C:\Users\user\Documents\Programming\virtual-flex"
+cd path/to/virtual-flex
 python -m virtualflex --config config.toml --log-level INFO
 ```
 

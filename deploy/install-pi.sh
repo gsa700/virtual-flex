@@ -6,9 +6,9 @@
 #     sudo bash deploy/install-pi.sh
 #
 # Override any default with an env var (use `sudo -E` so they pass through).
-# The defaults below already match this station (K4 at <LAN_IP>); a typical
-# override just sets a subnet-directed broadcast and/or the paired serial:
-#     BROADCAST_ADDR=<LAN_IP> FLEX_SERIAL=1234-5678-9012-3456 sudo -E bash deploy/install-pi.sh
+# Set K4_IP to your K4's network-CAT address; a subnet-directed broadcast is
+# safest. Example:
+#     K4_IP=192.168.1.105 BROADCAST_ADDR=192.168.1.255 FLEX_SERIAL=1234-5678-9012-3456 sudo -E bash deploy/install-pi.sh
 #
 # Requires Raspberry Pi OS Bookworm+ (Python 3.11+) on the same subnet as the
 # 4O3A stack. It talks to the K4 and the stack entirely over the LAN — no wires.
@@ -16,12 +16,12 @@
 set -euo pipefail
 
 # ---- settings (override via env) -------------------------------------------
-K4_IP="${K4_IP:-<LAN_IP>}"                        # K4 network-CAT IP
+K4_IP="${K4_IP:-192.168.1.100}"                     # K4 network-CAT IP  (override for your station)
 K4_CAT_PORT="${K4_CAT_PORT:-9200}"                  # K4 CAT port
 RIG_MODEL="${RIG_MODEL:-2047}"                      # hamlib model (2047 = Elecraft K4)
 RIGCTLD_PORT="${RIGCTLD_PORT:-4532}"                # local rigctld port
 FLEX_SERIAL="${FLEX_SERIAL:-1234-5678-9012-3456}"   # serial the 4O3A stack pairs to
-BROADCAST_ADDR="${BROADCAST_ADDR:-255.255.255.255}" # subnet bcast is safest, e.g. <LAN_IP>
+BROADCAST_ADDR="${BROADCAST_ADDR:-255.255.255.255}" # subnet bcast is safest, e.g. 192.168.1.255
 CALLSIGN="${CALLSIGN:-AB0R}"
 NICKNAME="${NICKNAME:-VirtualFlex}"
 
