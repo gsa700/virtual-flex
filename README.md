@@ -70,6 +70,22 @@ Then in the 4O3A utilities, pair each box's FlexRadio to the serial in
 For a bench test with no radio, set `[rig] source = "sim"` and `[ptt] source =
 "none"`.
 
+## Deploy (always-on)
+
+To run it as boot-persistent systemd services on a Debian 12+ box (VM, LXC, or
+Pi) that shares the 4O3A stack's subnet:
+
+```bash
+git clone https://github.com/gsa700/virtual-flex ~/virtual-flex
+cd ~/virtual-flex
+K4_IP=<your K4 IP> BROADCAST_ADDR=<your subnet bcast> sudo -E bash deploy/install.sh
+```
+
+It installs Hamlib, generates `config.toml`, writes the `rigctld` + `virtual-flex`
+services, and enables them. **The host must be on the same L2 segment as the
+stack** — discovery is a UDP broadcast, so bridge the VM/LXC NIC onto that LAN
+(don't route to it). See `deploy/install.sh` for all overridable settings.
+
 ## Keying & PTT
 
 LAN keying works for the whole stack, but there's an unavoidable nuance: a real
