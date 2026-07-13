@@ -8,6 +8,7 @@ import logging
 from . import __version__
 from .config import Config
 from .discovery import DiscoveryBroadcaster
+from .ptt import K4PttMonitor
 from .rigsource import build_source
 from .server import CommandServer
 from .state import Radio
@@ -33,9 +34,18 @@ async def run(cfg: Config, host: str) -> None:
     discovery = DiscoveryBroadcaster(radio)
     source = build_source(radio)
 
+    tasks = [server.serve(), discovery.run(), source.run()]
+    if str(cfg.ptt.get("source", "none")).lower() == "k4cat":
+        k = cfg.ptt.get("k4cat", {})
+        monitor = K4PttMonitor(radio, host=str(k.get("host", "127.0.0.1")),
+                               port=int(k.get("port", 9200)),
+                               poll_interval=float(k.get("poll_interval", 0.01)))
+        tasks.append(monitor.run())
+        log.info("K4 CAT PTT detection enabled (%s:%s)", k.get("host"), k.get("port"))
+
     log.info("virtual-flex %s up - model=%s serial=%s advertising ip=%s",
              __version__, cfg.radio["model"], cfg.radio["serial"], cfg.advertise_ip())
-    await asyncio.gather(server.serve(), discovery.run(), source.run())
+    await asyncio.gather(*tasks)
 
 
 def main(argv: list[str] | None = None) -> None:

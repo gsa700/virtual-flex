@@ -27,7 +27,9 @@ class FakeWriter:
 
 def make_session():
     radio = Radio(Config.load(None))
-    return ClientSession(radio, reader=None, writer=FakeWriter()), radio
+    session = ClientSession(radio, reader=None, writer=FakeWriter())
+    radio.add_client(session)
+    return session, radio
 
 
 def sent(session) -> str:
@@ -68,6 +70,7 @@ def test_sub_slice_acks_then_dumps_status():
     assert "slice 0" in text
     assert "RF_frequency=14.074000" in text
     assert "tx=1" in text
+    assert "transmit freq=14.074000" in text  # the object the amp reads its band from
 
 
 def test_ping_and_keepalive_ack():
@@ -83,3 +86,31 @@ def test_unknown_command_is_acked_permissively():
     s, _ = make_session()
     s._dispatch("8", "wibble frobnicate")
     assert sent(s).splitlines() == ["R8|0|"]
+
+
+def test_set_transmit_broadcasts_interlock():
+    s, radio = make_session()
+    radio.set_transmit(True)
+    assert "state=TRANSMITTING" in sent(s)
+    assert "tx_allowed=1" in sent(s)
+    radio.set_transmit(False)
+    assert "state=READY" in sent(s)  # idle interlock, matching the real 8600
+
+
+def test_set_transmit_is_edge_triggered():
+    s, radio = make_session()
+    radio.set_transmit(False)  # no change from initial idle -> no output
+    assert sent(s) == ""
+    radio.set_transmit(True)   # one key -> PTT_REQUESTED + TRANSMITTING (2 lines)
+    radio.set_transmit(True)   # repeat -> no additional output
+    assert sent(s).count("interlock") == 2
+    assert "state=PTT_REQUESTED" in sent(s)
+
+
+def test_amplifier_client_handle_in_interlock():
+    s, radio = make_session()
+    s._dispatch("2", "amplifier create ip=1.2.3.4 port=9008 model=PowerGeniusXL")
+    radio.set_transmit(True)
+    # The amp's connection handle should appear in the TRANSMITTING interlock.
+    handle = f"0x{s.handle:08X}"
+    assert f"amplifier={handle}" in sent(s)

@@ -1,6 +1,7 @@
 """Configuration loading (TOML) with defaults. Stdlib ``tomllib`` only."""
 from __future__ import annotations
 
+import copy
 import socket
 import tomllib
 from dataclasses import dataclass, field
@@ -27,6 +28,10 @@ _DEFAULTS: dict = {
         "sim": {"frequency": 14074000, "mode": "USB", "sweep_hz_per_sec": 0},
         "hamlib": {"host": "127.0.0.1", "port": 4532, "poll_interval": 0.1},
     },
+    "ptt": {
+        "source": "none",  # "none" = interlock stays RECEIVE; "k4cat" = detect K4 TX over CAT
+        "k4cat": {"host": "127.0.0.1", "port": 9200, "poll_interval": 0.01},
+    },
 }
 
 
@@ -45,14 +50,16 @@ class Config:
     radio: dict = field(default_factory=dict)
     network: dict = field(default_factory=dict)
     rig: dict = field(default_factory=dict)
+    ptt: dict = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path | None) -> "Config":
-        data = dict(_DEFAULTS)
+        data = copy.deepcopy(_DEFAULTS)
         if path:
             with open(path, "rb") as fh:
                 data = _deep_merge(data, tomllib.load(fh))
-        return cls(radio=data["radio"], network=data["network"], rig=data["rig"])
+        return cls(radio=data["radio"], network=data["network"],
+                   rig=data["rig"], ptt=data["ptt"])
 
     def advertise_ip(self) -> str:
         configured = self.network.get("advertise_ip") or ""

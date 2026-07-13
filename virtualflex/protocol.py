@@ -43,6 +43,7 @@ class ClientSession:
         self.handle = radio.alloc_handle()
         self.subscriptions: set[str] = set()
         self.keepalive = False
+        self.is_amplifier = False  # set when this client registers via `amplifier create`
         self.peer = writer.get_extra_info("peername")
 
     # --- helpers --------------------------------------------------------------
@@ -61,9 +62,12 @@ class ClientSession:
     async def run(self) -> None:
         self.radio.add_client(self)
         log.info("client connected: %s (handle 0x%08X)", self.peer, self.handle)
-        # Handshake: the radio speaks first.
+        # Handshake: the radio speaks first, then an initial state dump.
         self.send_line("V1.4.0.0")
         self.send_line(f"H{self.handle:08X}")
+        self.send_line(self.radio.radio_status_line())
+        self.send_line(self.radio.interlock_config_line())
+        self.send_line(self.radio.interlock_status_line())  # valid PTT path from the start
         await self.writer.drain()
 
         buffer = b""
@@ -100,6 +104,7 @@ class ClientSession:
         self._dispatch(seq, command.strip())
 
     def _dispatch(self, seq: str, command: str) -> None:
+        log.debug("recv <= C%s|%s", seq, command)  # full command trace for bring-up
         tokens = command.split()
         verb = tokens[0].lower() if tokens else ""
 
@@ -138,12 +143,14 @@ class ClientSession:
         if obj in ("slice", "tx", "all"):
             for index in sorted(self.radio.slices):
                 self.send_line(self.radio.slices[index].status_line())
+            self.send_line(self.radio.transmit_status_line())
 
     def _cmd_amplifier(self, seq: str, args: list[str]) -> None:
         if args and args[0].lower() == "create":
             kv = parse_kv(args[1:])
             handle = self.radio.alloc_handle()
             self.radio.amplifiers[f"0x{handle:08X}"] = kv
+            self.is_amplifier = True  # so our conn handle appears in interlock amplifier=
             log.info("amplifier registered: %s", kv)
             # FLEX returns the new object's handle as the response message.
             self._ok(seq, f"0x{handle:08X}")
