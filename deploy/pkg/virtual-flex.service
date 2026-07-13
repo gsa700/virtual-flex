@@ -1,0 +1,14 @@
+[Unit]
+Description=virtual-flex (FlexRadio emulator for the 4O3A stack)
+After=network-online.target virtual-flex-rigctld.service
+Wants=network-online.target virtual-flex-rigctld.service
+
+[Service]
+WorkingDirectory=/usr/lib/virtual-flex
+ExecStart=/usr/bin/python3 -m virtualflex --config /etc/virtual-flex/config.toml --log-level INFO
+Restart=always
+RestartSec=5
+DynamicUser=yes
+
+[Install]
+WantedBy=multi-user.target

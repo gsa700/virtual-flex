@@ -86,6 +86,30 @@ services, and enables them. **The host must be on the same L2 segment as the
 stack** — discovery is a UDP broadcast, so bridge the VM/LXC NIC onto that LAN
 (don't route to it). See `deploy/install.sh` for all overridable settings.
 
+## Releases
+
+Each version tag publishes a **`.deb`** and a source **`.zip`** on the
+[Releases](https://github.com/gsa700/virtual-flex/releases) page.
+
+**Debian/Ubuntu (VM, LXC, Pi):**
+```bash
+sudo apt install ./virtual-flex_<version>_all.deb   # pulls python3 + libhamlib-utils
+sudoedit /etc/virtual-flex/rigctld.env              # set K4_IP, RIG_MODEL
+sudoedit /etc/virtual-flex/config.toml              # serial, broadcast, ptt K4 IP
+sudo systemctl start virtual-flex-rigctld virtual-flex
+```
+
+**Windows / anything else:** download the `.zip`, install Python 3.11+ and Hamlib
+yourself, then run as in [Run](#run).
+
+**Cutting a release (maintainer):** the workflow builds and publishes both assets
+on a version tag —
+```bash
+git tag v0.1.0 && git push --tags
+```
+
+Build the artifacts locally with `bash deploy/build-deb.sh` / `bash deploy/build-zip.sh`.
+
 ## Keying & PTT
 
 LAN keying works for the whole stack, but there's an unavoidable nuance: a real
