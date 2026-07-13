@@ -1,0 +1,37 @@
+# virtual-flex configuration. Copy to config.toml and edit.
+# Run with:  python -m virtualflex --config config.toml
+
+[radio]
+# Values advertised in the VITA-49 discovery broadcast.
+# IMPORTANT: the PGXL matches `serial` against the FlexRadio serial you pair it
+# with (its `flexradio ... serial=` setting), so this MUST equal that value.
+# Easiest/safest during bring-up: use your real FLEX-8600's serial (it isn't
+# always connected), so the amp accepts it without question.
+model    = "FLEX-8600"
+serial   = "1234-5678-9012-3456"
+version  = "3.6.19.35"   # firmware/SmartSDR version string; match a real 8600 if the PGXL validates it (confirm from capture)
+name     = "VirtualFlex"
+nickname = "VirtualFlex"
+callsign = "AB0R"
+
+[network]
+command_port      = 4992              # TCP command/status port the amp connects to (FlexRadio standard)
+discovery_port    = 4992              # UDP discovery broadcast port (confirm 4992 vs 4991 from capture)
+broadcast_address = "255.255.255.255" # use a subnet-directed bcast (e.g. 192.168.0.255) if your stack needs it
+discovery_interval = 1.0             # seconds between discovery broadcasts
+advertise_ip      = ""               # IP the amp connects back to; blank = autodetect
+
+[rig]
+source = "sim"   # "sim" for Phase-1 bring-up, "hamlib" to follow a real radio via rigctld
+
+[rig.sim]
+frequency        = 14074000  # Hz reported by the fake radio
+mode             = "USB"
+sweep_hz_per_sec = 0         # >0 slowly sweeps the band so you can watch the amp/tuner follow
+
+[rig.hamlib]
+# Start rigctld pointed at your K4 first, e.g.:
+#   rigctld -m <K4_model> -r <k4_ip>:9200 -t 4532
+host          = "127.0.0.1"
+port          = 4532
+poll_interval = 0.1
