@@ -1,0 +1,33 @@
+# virtual-flex config (installed as a conffile — your edits survive package upgrades).
+# EDIT the values marked below, then: sudo systemctl restart virtual-flex
+
+[radio]
+model    = "FLEX-8600"
+serial   = "1234-5678-9012-3456"   # EDIT: the serial you pair the 4O3A stack to
+version  = "3.6.19.35"
+name     = "VirtualFlex"
+nickname = "VirtualFlex"
+callsign = "N0CALL"                 # EDIT: your callsign
+
+[network]
+command_port       = 4992
+discovery_port     = 4992
+broadcast_address  = "255.255.255.255"  # EDIT: subnet-directed is safest, e.g. 192.168.1.255
+discovery_interval = 1.0
+advertise_ip       = ""
+
+[rig]
+source = "hamlib"
+
+[rig.hamlib]
+host          = "127.0.0.1"   # local rigctld (configured in /etc/virtual-flex/rigctld.env)
+port          = 4532
+poll_interval = 0.1
+
+[ptt]
+source = "k4cat"              # Elecraft K4 direct-CAT TX detection; "none" disables keying
+
+[ptt.k4cat]
+host          = "192.168.1.100"  # EDIT: your K4's CAT IP (match K4_IP in rigctld.env)
+port          = 9200
+poll_interval = 0.003
