@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import re
 import socket
 import tomllib
 from dataclasses import dataclass, field
@@ -64,6 +65,50 @@ class Config:
     def advertise_ip(self) -> str:
         configured = self.network.get("advertise_ip") or ""
         return configured if configured else detect_local_ip()
+
+    def resolve_serial(self) -> tuple[str, str]:
+        """Resolve the advertised serial, returning ``(serial, note)``.
+
+        If ``radio.serial`` is blank or ``"auto"``, derive it from the K4's
+        hostname in ``[ptt.k4cat].host`` (e.g. ``K4-SN01234`` -> the K4 serial).
+        Otherwise the configured value is used verbatim. On failure to derive we
+        fall back to the built-in placeholder so the app still starts.
+        """
+        configured = str(self.radio.get("serial", "")).strip()
+        if configured and configured.lower() != "auto":
+            return configured, "configured"
+
+        host = ""
+        if str(self.ptt.get("source", "none")).lower() == "k4cat":
+            host = str(self.ptt.get("k4cat", {}).get("host", ""))
+        derived = derive_flex_serial(str(self.radio.get("model", "")), host)
+        if derived:
+            return derived, f"auto-derived from K4 hostname '{host}'"
+
+        placeholder = _DEFAULTS["radio"]["serial"]
+        return placeholder, (
+            "could not auto-derive a serial (no K4-SN<n> hostname on "
+            f"ptt.k4cat.host='{host}', source={self.ptt.get('source')}) - "
+            "using placeholder; set radio.serial explicitly")
+
+
+def derive_flex_serial(model: str, host: str) -> str | None:
+    """Build a FlexRadio-style ``NNNN-NNNN-NNNN-NNNN`` serial from a K4 hostname.
+
+    Elecraft K4s answer mDNS as ``K4-SN<digits>`` (e.g. ``K4-SN01234.local``).
+    We take those digits as the low bits and prefix the emulated model number,
+    e.g. model ``FLEX-8600`` + ``K4-SN01234`` -> ``8600-0000-0000-1234``. The
+    model prefix can't collide with a real 8600 serial (those start with a year
+    like ``1926``), and the tail is recognizably the operator's K4.
+
+    Returns ``None`` if no ``SN<digits>`` is present (e.g. host is a raw IP).
+    """
+    m = re.search(r"SN(\d+)", host or "", re.IGNORECASE)
+    if not m:
+        return None
+    prefix = ("".join(ch for ch in (model or "") if ch.isdigit()) or "0000")[:4].rjust(4, "0")
+    tail = m.group(1)[-12:].rjust(12, "0")
+    return f"{prefix}-{tail[0:4]}-{tail[4:8]}-{tail[8:12]}"
 
 
 def detect_local_ip() -> str:

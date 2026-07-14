@@ -3,7 +3,7 @@
 
 [radio]
 model    = "FLEX-8600"
-serial   = "1234-5678-9012-3456"   # EDIT: the serial you pair the 4O3A stack to
+serial   = "auto"                  # "auto" derives from the K4 hostname & logs it; or pin an explicit serial. Pair the stack to whatever is logged.
 version  = "3.6.19.35"
 name     = "VirtualFlex"
 nickname = "VirtualFlex"

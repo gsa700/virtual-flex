@@ -66,9 +66,13 @@ python -m virtualflex --config config.toml --log-level INFO
 ```
 
 Then in the 4O3A utilities, pair each box's FlexRadio to the serial in
-`config.toml` (`radio.serial`). Config lives in `config.toml` (copy from
-`config.example.toml`); it selects the rig source (`hamlib`) and the PTT source
-(`k4cat`, pointed at the K4's CAT IP).
+`config.toml` (`radio.serial`). With the default `serial = "auto"`, virtual-flex
+derives that serial from the K4's hostname (`K4-SN01234` → `8600-0000-0000-1234`)
+and logs it at startup — pair the stack to whatever it logs. Pin an explicit
+serial once paired so a later K4 rename can't change it (re-pairing is keyed to
+the serial). Config lives in `config.toml` (copy from `config.example.toml`); it
+selects the rig source (`hamlib`) and the PTT source (`k4cat`, pointed at the
+K4's CAT host).
 
 For a bench test with no radio, set `[rig] source = "sim"` and `[ptt] source =
 "none"`.

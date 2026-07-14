@@ -5,10 +5,13 @@
 # Values advertised in the VITA-49 discovery broadcast.
 # IMPORTANT: the PGXL matches `serial` against the FlexRadio serial you pair it
 # with (its `flexradio ... serial=` setting), so this MUST equal that value.
-# Easiest/safest during bring-up: use your real FLEX-8600's serial (it isn't
-# always connected), so the amp accepts it without question.
+# "auto" (the default) derives it from the K4 hostname in [ptt.k4cat].host
+# (e.g. K4-SN01234 -> 8600-0000-0000-1234) and logs it at startup; pair the
+# stack to whatever it logs. Set an explicit serial to pin it (recommended once
+# paired, so a K4 rename can't change it). During bring-up you can also use your
+# real FLEX-8600's serial and the amp accepts it without question.
 model    = "FLEX-8600"
-serial   = "1234-5678-9012-3456"
+serial   = "auto"
 version  = "3.6.19.35"   # firmware/SmartSDR version string; match a real 8600 if the PGXL validates it (confirm from capture)
 name     = "VirtualFlex"
 nickname = "VirtualFlex"
