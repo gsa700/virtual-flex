@@ -57,6 +57,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     logging.getLogger("asyncio").setLevel(logging.WARNING)  # keep our DEBUG readable
     cfg = Config.load(args.config)
+    serial, note = cfg.resolve_serial()
+    cfg.radio["serial"] = serial
+    (log.warning if note.startswith("could not") else log.info)(
+        "radio serial=%s (%s)", serial, note)
     try:
         asyncio.run(run(cfg, args.host))
     except KeyboardInterrupt:

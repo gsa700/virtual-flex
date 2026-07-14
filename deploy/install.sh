@@ -24,7 +24,7 @@ K4_HOST="${K4_HOST:-${K4_IP:-K4-SNxxxxx.local}}"    # K4 mDNS name (K4-SN<serial
 K4_CAT_PORT="${K4_CAT_PORT:-9200}"                  # K4 CAT port
 RIG_MODEL="${RIG_MODEL:-2047}"                      # hamlib model (2047 = Elecraft K4)
 RIGCTLD_PORT="${RIGCTLD_PORT:-4532}"                # local rigctld port
-FLEX_SERIAL="${FLEX_SERIAL:-1234-5678-9012-3456}"   # serial the 4O3A stack pairs to
+FLEX_SERIAL="${FLEX_SERIAL:-auto}"                  # "auto" derives from the K4 hostname (logged at startup); or pin a serial
 BROADCAST_ADDR="${BROADCAST_ADDR:-255.255.255.255}" # subnet bcast is safest, e.g. 192.168.1.255
 CALLSIGN="${CALLSIGN:-AB0R}"
 NICKNAME="${NICKNAME:-VirtualFlex}"
@@ -160,7 +160,7 @@ systemctl --no-pager --lines=0 status rigctld.service virtual-flex.service || tr
 cat <<EOF
 
 virtual-flex is running as a service.
-  Pair the 4O3A stack to serial:  ${FLEX_SERIAL}
+  Serial to pair the 4O3A stack:  ${FLEX_SERIAL}$([ "${FLEX_SERIAL}" = auto ] && printf '  <- check the log for the derived value')
   Watch logs:                     journalctl -u virtual-flex -f
   Restart after code changes:     sudo systemctl restart virtual-flex
   Stop:                           sudo systemctl stop virtual-flex rigctld
