@@ -40,24 +40,54 @@ class HamlibSource(RigSource):
         log.info("connected to rigctld at %s:%d", self.host, self.port)
         try:
             while True:
-                # Frequency + mode are what the amp follows. `slice.tx=1` is a
-                # static "this is the transmit slice" designation, not PTT state —
-                # keying stays on the hardware PTT line — so we don't touch it here.
-                # (Split-across-bands, where the TX VFO differs, is a later refinement.)
-                freq = await self._query1(reader, writer, "f")
+                # The stack follows the TRANSMIT frequency. In split that's VFO B,
+                # not the displayed VFO A — so when split is on we feed slice 0 the
+                # split TX freq (get_split_freq) instead of get_freq. `slice.tx=1`
+                # is a static "this is the transmit slice" designation, not PTT.
+                split_on = await self._get_split(reader, writer)
+                cur_freq = await self._query1(reader, writer, "f")
                 mode_lines = await self._query(reader, writer, "m", 2)
+                tx_freq = ""
+                if split_on:
+                    tx_freq = await self._query1(reader, writer, "i")  # get_split_freq
 
-                update: dict = {}
-                if freq and freq.lstrip("-").isdigit():
-                    update["freq_hz"] = int(freq)
-                if mode_lines and not mode_lines[0].startswith("RPRT"):
-                    update["mode"] = mode_lines[0]
+                mode0 = mode_lines[0] if mode_lines else ""
+                update = self._tx_update(split_on, cur_freq, tx_freq, mode0)
                 if update:
                     self.radio.update_slice(0, **update)
 
                 await asyncio.sleep(self.poll_interval)
         finally:
             writer.close()
+
+    @staticmethod
+    def _tx_update(split_on: bool, cur_freq: str, tx_freq: str, mode0: str) -> dict:
+        """Pick the freq/mode the stack should track. In split the amp must follow
+        the TX VFO (VFO B) via get_split_freq; otherwise the current VFO. Falls back
+        to the current VFO if the split freq is missing/errored so we never blank."""
+        use_tx = split_on and tx_freq.lstrip("-").isdigit()
+        freq = tx_freq if use_tx else cur_freq
+        update: dict = {}
+        if freq and freq.lstrip("-").isdigit():
+            update["freq_hz"] = int(freq)
+        if mode0 and not mode0.startswith("RPRT"):
+            update["mode"] = mode0
+        return update
+
+    async def _get_split(self, reader: asyncio.StreamReader,
+                         writer: asyncio.StreamWriter) -> bool:
+        """get_split_vfo (`s`) -> True if split is on. Tolerant of backends that
+        answer with a single RPRT error line (won't block waiting for a VFO line)."""
+        writer.write(b"s\n")
+        await writer.drain()
+        line = await reader.readline()
+        if not line:
+            raise ConnectionError("rigctld closed the connection")
+        first = line.decode("ascii", "replace").strip()
+        if first.startswith("RPRT"):
+            return False  # split not reported by this backend
+        await reader.readline()  # consume the TX-VFO line (2nd line of the reply)
+        return first == "1"
 
     async def _query(self, reader: asyncio.StreamReader,
                      writer: asyncio.StreamWriter, cmd: str, nlines: int) -> list[str]:
