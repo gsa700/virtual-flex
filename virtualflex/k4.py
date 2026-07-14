@@ -1,0 +1,168 @@
+"""Native Elecraft K4/K4D network-CAT client.
+
+A single connection to the K4's CAT port (9200). Fast-polls ``TQX`` for
+low-latency PTT and periodically reads ``FA/FB/FT/MD`` for the transmit
+frequency and mode. In split (``FT=1``) the transmit VFO is B, so the stack must
+follow ``FB``; otherwise ``FA``.
+
+The K4 is addressed by IP (no per-connect DNS). If the cached IP stops
+answering, one mDNS lookup relearns it (see :func:`mdns.resolve`) so DHCP
+installs self-heal. Reconnects with exponential backoff so a powered-off radio
+stays quiet on the network.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Callable, Optional
+
+from . import mdns
+
+log = logging.getLogger("virtualflex.k4")
+
+# Elecraft MD codes -> Flex mode strings. Band/relay logic keys off frequency,
+# so the exact mode only matters for display; map the common ones sensibly.
+_MODE = {"1": "LSB", "2": "USB", "3": "CW", "4": "FM",
+         "5": "AM", "6": "DIGU", "7": "CW", "9": "DIGL"}
+
+TxCallback = Callable[[int, str], None]     # (tx_freq_hz, mode)
+PttCallback = Callable[[bool], None]        # keyed?
+
+
+class K4Client:
+    _MIN_BACKOFF = 2.0
+    _MAX_BACKOFF = 60.0
+
+    def __init__(self, *, ip: str, port: int = 9200, hostname: str | None = None,
+                 ptt_interval: float = 0.003, freq_interval: float = 0.1,
+                 stale_after: float = 3.0,
+                 on_tx: TxCallback | None = None,
+                 on_ptt: PttCallback | None = None) -> None:
+        self.ip = ip
+        self.port = port
+        self.hostname = hostname            # for mDNS IP-refresh; None disables it
+        self.ptt_interval = ptt_interval
+        self.freq_interval = freq_interval
+        self._stale_after = stale_after
+        self.on_tx = on_tx or (lambda f, m: None)
+        self.on_ptt = on_ptt or (lambda k: None)
+
+        self._vfo_a: Optional[int] = None
+        self._vfo_b: Optional[int] = None
+        self._tx_vfo = 0
+        self._mode = ""
+        self._ptt = False
+        self._last_emit: Optional[tuple[int, str]] = None
+
+        self._connected = False
+        self._connected_this_session = False
+        self._last_rx = 0.0
+
+    # ---- presence (consumed by the supervisor) -----------------------------
+    def is_present(self) -> bool:
+        """True while connected AND a valid response arrived recently."""
+        if not self._connected:
+            return False
+        return (asyncio.get_running_loop().time() - self._last_rx) < self._stale_after
+
+    @property
+    def tx_freq_hz(self) -> Optional[int]:
+        return self._vfo_b if self._tx_vfo == 1 else self._vfo_a
+
+    # ---- lifecycle ----------------------------------------------------------
+    async def run(self) -> None:
+        backoff = self._MIN_BACKOFF
+        while True:
+            self._connected_this_session = False
+            try:
+                await self._session()
+            except (OSError, ConnectionError, asyncio.IncompleteReadError) as exc:
+                log.debug("K4 session ended: %s", exc)
+            self._connected = False
+            if self._connected_this_session:
+                # a live link dropped — reconnect to the same IP promptly
+                await asyncio.sleep(self._MIN_BACKOFF)
+                continue
+            # never connected: the cached IP may be stale — try to relearn it
+            new_ip = await self._refresh_ip()
+            if new_ip and new_ip != self.ip:
+                log.info("K4 address changed %s -> %s (mDNS)", self.ip, new_ip)
+                self.ip = new_ip
+                backoff = self._MIN_BACKOFF
+                continue
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, self._MAX_BACKOFF)
+
+    async def _refresh_ip(self) -> str | None:
+        if not self.hostname:
+            return None
+        try:
+            return await mdns.resolve(self.hostname)
+        except OSError as exc:
+            log.debug("mDNS refresh failed: %s", exc)
+            return None
+
+    async def _session(self) -> None:
+        reader, writer = await asyncio.open_connection(self.ip, self.port)
+        self._connected = True
+        self._connected_this_session = True
+        self._last_rx = asyncio.get_running_loop().time()
+        log.info("K4 CAT connected to %s:%d", self.ip, self.port)
+        try:
+            await asyncio.gather(self._writer_loop(writer), self._reader_loop(reader))
+        finally:
+            writer.close()
+
+    async def _writer_loop(self, writer: asyncio.StreamWriter) -> None:
+        writer.write(b"FA;FB;FT;MD;TQX;")          # initial full read
+        await writer.drain()
+        every = max(1, round(self.freq_interval / self.ptt_interval))
+        tick = 0
+        while True:
+            writer.write(b"TQX;")                  # fast PTT poll every cycle
+            if tick % every == 0:
+                writer.write(b"FA;FB;FT;MD;")       # freq/mode less often
+            await writer.drain()
+            tick += 1
+            await asyncio.sleep(self.ptt_interval)
+
+    async def _reader_loop(self, reader: asyncio.StreamReader) -> None:
+        buf = ""
+        while True:
+            data = await reader.read(512)
+            if not data:
+                raise ConnectionError("K4 closed the CAT connection")
+            self._last_rx = asyncio.get_running_loop().time()
+            buf += data.decode("ascii", "replace")
+            while ";" in buf:
+                stmt, _, buf = buf.partition(";")
+                self._dispatch(stmt.strip())
+
+    def _dispatch(self, stmt: str) -> None:
+        try:
+            if stmt.startswith("FA"):
+                self._vfo_a = int(stmt[2:]); self._emit_tx()
+            elif stmt.startswith("FB"):
+                self._vfo_b = int(stmt[2:]); self._emit_tx()
+            elif stmt.startswith("FT"):
+                self._tx_vfo = int(stmt[2:3]); self._emit_tx()
+            elif stmt.startswith("MD") and not stmt.startswith("MD$"):
+                self._mode = _MODE.get(stmt[2:3], self._mode); self._emit_tx()
+            elif stmt.startswith("TQ"):
+                self._emit_ptt(stmt[2:3] == "1")
+        except (ValueError, IndexError):
+            log.debug("unparsable K4 statement: %r", stmt)
+
+    def _emit_tx(self) -> None:
+        freq = self.tx_freq_hz
+        if not freq or freq <= 0 or not self._mode:
+            return
+        cur = (freq, self._mode)
+        if cur != self._last_emit:
+            self._last_emit = cur
+            self.on_tx(freq, self._mode)
+
+    def _emit_ptt(self, keyed: bool) -> None:
+        if keyed != self._ptt:
+            self._ptt = keyed
+            self.on_ptt(keyed)
