@@ -1,6 +1,6 @@
 [project]
 name = "virtual-flex"
-version = "0.1.0"
+version = "0.1.1"
 description = "A virtual FlexRadio: lets a hamlib-controlled rig drive the 4O3A PGXL/TGXL/AGXL stack as if it were a FLEX-6000/8000."
 readme = "README.md"
 requires-python = ">=3.11"
