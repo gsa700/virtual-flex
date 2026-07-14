@@ -91,6 +91,24 @@ over mDNS wherever the K4 lands. **The host must be on the same L2 segment as th
 stack** — discovery is a UDP broadcast, so bridge the VM/LXC NIC onto that LAN
 (don't route to it). See `deploy/install.sh` for all overridable settings.
 
+### If mDNS doesn't resolve (IP fallback)
+
+Some networks block multicast (isolated VLANs, certain APs / guest networks), so
+`K4-SN<serial>.local` may not resolve. Check on the host:
+
+```bash
+getent hosts K4-SN<serial>.local     # should print the K4's IP
+```
+
+If it's empty even with `libnss-mdns` + `avahi-daemon` installed, just use the
+K4's **IP** anywhere a host is expected — the installer, `K4_HOST`, `rigctld.env`,
+and `config.toml` all take an IP interchangeably. A DHCP reservation keeps it
+stable:
+
+```bash
+K4_HOST=<your-K4-IP> sudo -E bash deploy/install.sh   # or edit /etc/virtual-flex/rigctld.env + config.toml
+```
+
 ## Releases
 
 Each version tag publishes a **`.deb`** and a source **`.zip`** on the
