@@ -44,6 +44,7 @@ class ClientSession:
         self.subscriptions: set[str] = set()
         self.keepalive = False
         self.is_amplifier = False  # set when this client registers via `amplifier create`
+        self.client_banner: str | None = None  # e.g. the Antenna Genius sends "V4.1.16 AG"
         self.peer = writer.get_extra_info("peername")
 
     # --- helpers --------------------------------------------------------------
@@ -53,6 +54,7 @@ class ClientSession:
     def send_line(self, line: str) -> None:
         if self.writer.is_closing():
             return
+        log.debug("-> %s: %s", self.peer, line)  # trace what we emit (diagnostics)
         self.writer.write((line + "\n").encode("ascii", "replace"))
 
     def _ok(self, seq: str, message: str = "") -> None:
@@ -91,7 +93,18 @@ class ClientSession:
 
     # --- command dispatch -----------------------------------------------------
     def _handle_line(self, line: str) -> None:
-        if line[:1] not in ("C", "c"):
+        tag = line[:1]
+        if tag == "V":
+            # Client version banner (the Antenna Genius greets with "V4.1.16 AG").
+            self.client_banner = line
+            log.info("client %s banner: %s", self.peer, line)
+            return
+        if tag == "R":
+            # Client reply/NAK. The AG sends "R0|1|" (code 1 = invalid command
+            # format) when its v4 parser rejects a line we sent. Diagnostic only.
+            log.debug("client %s reply/nak: %s", self.peer, line)
+            return
+        if tag not in ("C", "c"):
             log.warning("unexpected line from %s: %r", self.peer, line)
             return
         body = line[1:]
