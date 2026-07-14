@@ -11,16 +11,16 @@
 #     sudo bash deploy/install.sh
 #
 # Override any default with an env var (use `sudo -E` so they pass through).
-# Set K4_IP to your K4's network-CAT address; a subnet-directed broadcast is
-# safest. Optionally set RUN_USER to the account the services run as.
-#     K4_IP=192.168.1.105 BROADCAST_ADDR=192.168.1.255 RUN_USER=svc sudo -E bash deploy/install.sh
+# K4_HOST is your K4's mDNS name (pattern K4-SN<serial>.local, from the K4's
+# Network menu) or a raw IP. Optionally set RUN_USER / BROADCAST_ADDR.
+#     K4_HOST=K4-SN00895.local BROADCAST_ADDR=192.168.1.255 RUN_USER=svc sudo -E bash deploy/install.sh
 #
 # Requires Python 3.11+ (Debian 12 Bookworm / 13 Trixie both qualify).
 
 set -euo pipefail
 
 # ---- settings (override via env) -------------------------------------------
-K4_IP="${K4_IP:-192.168.1.100}"                     # K4 network-CAT IP  (override for your station)
+K4_HOST="${K4_HOST:-${K4_IP:-K4-SNxxxxx.local}}"    # K4 mDNS name (K4-SN<serial>.local) or IP — OVERRIDE for your station
 K4_CAT_PORT="${K4_CAT_PORT:-9200}"                  # K4 CAT port
 RIG_MODEL="${RIG_MODEL:-2047}"                      # hamlib model (2047 = Elecraft K4)
 RIGCTLD_PORT="${RIGCTLD_PORT:-4532}"                # local rigctld port
@@ -44,9 +44,9 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 [ -d "${REPO_DIR}/virtualflex" ] || die "virtualflex/ not found — run this from inside the cloned repo."
 
 # ---- 1. packages -----------------------------------------------------------
-log "Installing hamlib + git"
+log "Installing hamlib, git, and mDNS resolver (libnss-mdns/avahi)"
 apt-get update -qq
-apt-get install -y -qq libhamlib-utils git
+apt-get install -y -qq libhamlib-utils git libnss-mdns avahi-daemon
 
 # ---- 2. preflight checks ---------------------------------------------------
 PY="$(command -v python3 || true)"
@@ -61,6 +61,15 @@ if rigctl -l | grep -qiE "(^|[[:space:]])${RIG_MODEL}[[:space:]].*K4|[[:space:]]
   log "hamlib K4 backend (model ${RIG_MODEL}) present"
 else
   warn "Model ${RIG_MODEL}/K4 not found in 'rigctl -l' — your hamlib may be too old; the service could fail."
+fi
+
+# Verify the K4 host resolves (mDNS .local needs the libnss-mdns/avahi just installed).
+if printf '%s' "$K4_HOST" | grep -qE '^[0-9.]+$'; then
+  log "K4 host is an IP (${K4_HOST}) — skipping name resolution check"
+elif getent hosts "$K4_HOST" >/dev/null; then
+  log "K4 host ${K4_HOST} resolves to $(getent hosts "$K4_HOST" | awk '{print $1}')"
+else
+  warn "K4 host ${K4_HOST} does not resolve yet — set K4_HOST=K4-SN<serial>.local (from the K4's Network menu) or use an IP. (The K4 may simply be off right now.)"
 fi
 
 # ---- 3. config.toml --------------------------------------------------------
@@ -98,7 +107,7 @@ poll_interval = 0.1
 source = "k4cat"
 
 [ptt.k4cat]
-host          = "${K4_IP}"
+host          = "${K4_HOST}"
 port          = ${K4_CAT_PORT}
 poll_interval = 0.003
 EOF
@@ -114,7 +123,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=${RIGCTLD} -m ${RIG_MODEL} -r ${K4_IP}:${K4_CAT_PORT} -t ${RIGCTLD_PORT}
+ExecStart=${RIGCTLD} -m ${RIG_MODEL} -r ${K4_HOST}:${K4_CAT_PORT} -t ${RIGCTLD_PORT}
 Restart=always
 RestartSec=5
 User=${RUN_USER}

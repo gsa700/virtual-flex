@@ -33,7 +33,7 @@ Version: ${VERSION}
 Section: hamradio
 Priority: optional
 Architecture: ${ARCH}
-Depends: python3 (>= 3.11), libhamlib-utils
+Depends: python3 (>= 3.11), libhamlib-utils, libnss-mdns, avahi-daemon
 Maintainer: AB0R <gsa700@users.noreply.github.com>
 Homepage: https://github.com/gsa700/virtual-flex
 Installed-Size: ${INSTALLED_KB}
@@ -54,8 +54,8 @@ set -e
 systemctl daemon-reload || true
 systemctl enable virtual-flex-rigctld.service virtual-flex.service >/dev/null 2>&1 || true
 echo "virtual-flex installed. Next:"
-echo "  1. edit /etc/virtual-flex/rigctld.env  (K4_IP, RIG_MODEL)"
-echo "  2. edit /etc/virtual-flex/config.toml   (serial, broadcast, ptt K4 IP)"
+echo "  1. edit /etc/virtual-flex/rigctld.env  (K4_HOST, RIG_MODEL)"
+echo "  2. edit /etc/virtual-flex/config.toml   (serial, broadcast, ptt K4 host)"
 echo "  3. sudo systemctl start virtual-flex-rigctld virtual-flex"
 echo "The host must share the 4O3A stack's LAN subnet (discovery is a broadcast)."
 exit 0

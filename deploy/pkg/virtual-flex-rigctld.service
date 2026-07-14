@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 EnvironmentFile=/etc/virtual-flex/rigctld.env
-ExecStart=/usr/bin/rigctld -m ${RIG_MODEL} -r ${K4_IP}:${K4_CAT_PORT} -t ${RIGCTLD_PORT}
+ExecStart=/usr/bin/rigctld -m ${RIG_MODEL} -r ${K4_HOST}:${K4_CAT_PORT} -t ${RIGCTLD_PORT}
 Restart=always
 RestartSec=5
 DynamicUser=yes
