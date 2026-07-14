@@ -47,6 +47,9 @@ the slower freq/mode loop, so keying latency isn't tied to it.
 - [Hamlib](https://hamlib.github.io/) (`rigctld`) for the frequency/mode path
 - An Elecraft K4 for the native TX‑detection path (other rigs: fall back to
   Hamlib PTT — not yet implemented)
+- On Linux, `libnss-mdns` + `avahi-daemon` to reach the K4 by its
+  `K4-SN<serial>.local` mDNS name instead of an IP (the `.deb` pulls these in;
+  the name is DHCP‑proof). Windows resolves `.local` natively.
 
 ## Run
 
@@ -55,7 +58,7 @@ The daemon needs `rigctld` running for freq/mode. For the K4D (Hamlib model
 
 ```bash
 # Terminal 1 — bridge the K4 to rigctld
-"C:\Program Files\hamlib-w64-4.7.2\bin\rigctld.exe" -m 2047 -r <K4_IP>:9200 -t 4532
+"C:\Program Files\hamlib-w64-4.7.2\bin\rigctld.exe" -m 2047 -r K4-SN<serial>.local:9200 -t 4532
 
 # Terminal 2 — the virtual radio
 cd path/to/virtual-flex
@@ -78,11 +81,13 @@ Pi) that shares the 4O3A stack's subnet:
 ```bash
 git clone https://github.com/gsa700/virtual-flex ~/virtual-flex
 cd ~/virtual-flex
-K4_IP=<your K4 IP> BROADCAST_ADDR=<your subnet bcast> sudo -E bash deploy/install.sh
+K4_HOST=K4-SN<serial>.local BROADCAST_ADDR=<your subnet bcast> sudo -E bash deploy/install.sh
 ```
 
-It installs Hamlib, generates `config.toml`, writes the `rigctld` + `virtual-flex`
-services, and enables them. **The host must be on the same L2 segment as the
+It installs Hamlib and an mDNS resolver, generates `config.toml`, writes the
+`rigctld` + `virtual-flex` services, and enables them. Addressing the K4 by its
+`K4-SN<serial>.local` name means no static IP or DHCP reservation — it resolves
+over mDNS wherever the K4 lands. **The host must be on the same L2 segment as the
 stack** — discovery is a UDP broadcast, so bridge the VM/LXC NIC onto that LAN
 (don't route to it). See `deploy/install.sh` for all overridable settings.
 
@@ -93,9 +98,9 @@ Each version tag publishes a **`.deb`** and a source **`.zip`** on the
 
 **Debian/Ubuntu (VM, LXC, Pi):**
 ```bash
-sudo apt install ./virtual-flex_<version>_all.deb   # pulls python3 + libhamlib-utils
-sudoedit /etc/virtual-flex/rigctld.env              # set K4_IP, RIG_MODEL
-sudoedit /etc/virtual-flex/config.toml              # serial, broadcast, ptt K4 IP
+sudo apt install ./virtual-flex_<version>_all.deb   # pulls python3, libhamlib-utils, libnss-mdns, avahi
+sudoedit /etc/virtual-flex/rigctld.env              # set K4_HOST (K4-SN<serial>.local), RIG_MODEL
+sudoedit /etc/virtual-flex/config.toml              # serial, broadcast, ptt K4 host
 sudo systemctl start virtual-flex-rigctld virtual-flex
 ```
 

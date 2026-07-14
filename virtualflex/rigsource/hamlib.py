@@ -3,7 +3,7 @@
 Polls a running ``rigctld`` for frequency, mode and PTT and feeds them into the
 shared radio state. Start rigctld against the K4 over its network CAT port::
 
-    rigctld -m <K4_model> -r <k4_ip>:9200 -t 4532
+    rigctld -m <K4_model> -r <k4_host>:9200 -t 4532   # k4_host: IP or K4-SN<serial>.local
 
 NOTE: written from the rigctld protocol spec; validate against a live K4 before
 relying on it. Reconnects automatically if rigctld goes away.

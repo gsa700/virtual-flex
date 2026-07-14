@@ -30,8 +30,9 @@ mode             = "USB"
 sweep_hz_per_sec = 0         # >0 slowly sweeps the band so you can watch the amp/tuner follow
 
 [rig.hamlib]
-# Start rigctld pointed at your K4 first, e.g.:
-#   rigctld -m <K4_model> -r <k4_ip>:9200 -t 4532
+# Start rigctld pointed at your K4 first. A K4-SN<serial>.local mDNS name works
+# and is DHCP-proof (needs libnss-mdns+avahi on Linux); a raw IP is fine too:
+#   rigctld -m <K4_model> -r K4-SN<serial>.local:9200 -t 4532
 host          = "127.0.0.1"
 port          = 4532
 poll_interval = 0.1
@@ -43,6 +44,6 @@ poll_interval = 0.1
 source = "none"
 
 [ptt.k4cat]
-host          = "127.0.0.1"  # K4 CAT IP (its network CAT port, same host as the radio)
+host          = "K4-SNxxxxx.local"  # K4 mDNS name (K4-SN<serial>.local, DHCP-proof) or IP; needs libnss-mdns+avahi on Linux
 port          = 9200
 poll_interval = 0.01         # 10 ms fast poll of TQX

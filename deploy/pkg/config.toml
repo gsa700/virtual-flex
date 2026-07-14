@@ -28,6 +28,6 @@ poll_interval = 0.1
 source = "k4cat"              # Elecraft K4 direct-CAT TX detection; "none" disables keying
 
 [ptt.k4cat]
-host          = "192.168.1.100"  # EDIT: your K4's CAT IP (match K4_IP in rigctld.env)
+host          = "K4-SNxxxxx.local"  # EDIT: K4 mDNS name (K4-SN<serial>) or IP; match K4_HOST in rigctld.env
 port          = 9200
 poll_interval = 0.003
