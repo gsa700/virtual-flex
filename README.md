@@ -23,9 +23,10 @@ a clean install from a bare Debian image:
 - **LAN keying** — the whole stack keys over LAN, including the amp, via the
   emulated interlock handshake (`PTT_REQUESTED → TRANSMITTING`, amp handle in
   `amplifier=`). No RCA/keyline required.
-- **Lightning‑safety failover** — when the K4 powers off, virtual‑flex disappears
-  like a real Flex would, so the **AGXL fails over to Dummy Load** and grounds the
-  antennas.
+- **Safe failover** — when the K4 powers off, virtual‑flex disappears like a real
+  Flex would, so the **AGXL reverts to its configured "no transceiver" antenna**.
+  Assign that to a dummy load (or a grounded port) and losing the radio parks the
+  station there automatically — e.g. for lightning safety.
 - **Fast recovery** — on K4 power‑up the stack reconnects within a couple of
   seconds; in on‑air use it's indistinguishable from a real FLEX‑8600 coming back.
 - **Quiet on the network** — one CAT socket to the K4, addressed by IP, so
@@ -46,7 +47,8 @@ Everything is sourced **natively from the K4's CAT port over a single socket** �
 `FA/FB/FT/MD` for frequency/mode/split and a fast `TQX` poll for low‑latency PTT.
 A **presence supervisor** owns the lifecycle: while the K4 is reachable it
 advertises and serves the stack; when the K4 goes absent it drops discovery and
-every stack connection, so the stack fails safe to Dummy Load.
+every stack connection, so each 4O3A box reverts to its configured "no
+transceiver" antenna.
 
 ## Requirements
 
@@ -115,7 +117,7 @@ The wire‑free LAN path is the intended product; the flash is the accepted cost
 
 | File | Role |
 |------|------|
-| `virtualflex/supervisor.py` | Presence state machine: K4 present → serve; absent → tear down (Dummy Load) |
+| `virtualflex/supervisor.py` | Presence state machine: K4 present → serve; absent → tear down (stack reverts to its no-transceiver antenna) |
 | `virtualflex/k4.py`         | Native K4 CAT client — freq/mode/split + fast PTT on one socket |
 | `virtualflex/mdns.py`       | Self‑contained unicast‑mDNS resolver (IP self‑heal) |
 | `virtualflex/discovery.py`  | VITA‑49 discovery broadcaster |

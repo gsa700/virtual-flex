@@ -19,9 +19,10 @@ The supervisor owns everything and is driven by K4 reachability:
 - **K4 PRESENT** → broadcast VITA-49 discovery, accept/serve the Genius stack,
   stream freq / mode / split / PTT from the K4 CAT.
 - **K4 ABSENT** → **stop discovery AND drop all stack TCP connections**, so the
-  stack sees the radio vanish (exactly like a real Flex powering off) and the
-  **AGXL fails over to Dummy Load — grounding antenna inputs for lightning
-  safety**. Then poll for the K4's return.
+  stack sees the radio vanish (exactly like a real Flex powering off) and each box
+  **reverts to its configured "no transceiver" antenna**. Set the AGXL's to a
+  dummy load (or a grounded port) and losing the radio parks the station there —
+  e.g. for lightning safety. Then poll for the K4's return.
 
 Debounce: the K4 must be gone `absent_after` s before teardown and present
 `present_after` s before advertising, so a brief blip doesn't chatter the AGXL
@@ -30,7 +31,7 @@ power-up recovery is a couple of seconds (a dead host would otherwise stall the
 connect on SYN-retransmit).
 
 > SAFETY: keeping a fake radio "present" while the K4 is off *defeats* the
-> stack's dummy-load failover. Presence teardown is a safety requirement, not
+> stack's no-transceiver failover. Presence teardown is a safety requirement, not
 > polish. (v0.1.x had this regression; v0.2 fixed it.)
 
 ## K4 addressing & IP changes (no DNS hammering)

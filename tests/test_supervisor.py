@@ -32,7 +32,7 @@ def test_supervisor_debounced_online_offline():
         await asyncio.sleep(0.1)
         assert events == ["online"]
 
-        # sustained absence -> OFFLINE (stack dropped -> AGXL to Dummy Load)
+        # sustained absence -> OFFLINE (stack dropped -> boxes revert to no-transceiver antenna)
         present["v"] = False
         await asyncio.sleep(0.15)
         assert events == ["online", "offline"] and not sup.online

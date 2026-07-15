@@ -95,7 +95,7 @@ class Radio:
     def drop_all_clients(self) -> None:
         """Close every stack connection and clear their registrations. Called when
         the K4 goes absent: the stack sees the radio vanish (like a real Flex
-        powering off) and the AGXL fails over to Dummy Load."""
+        powering off) and each box reverts to its no-transceiver antenna."""
         for client in list(self.clients):
             client.close()
         self.clients.clear()

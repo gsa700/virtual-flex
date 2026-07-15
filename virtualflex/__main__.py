@@ -2,7 +2,7 @@
 
 Wires the native K4 CAT client to the presence supervisor: while the K4 is
 reachable we advertise and serve the Genius stack; when it goes away we tear the
-whole thing down so the stack fails over to Dummy Load.
+whole thing down so the stack reverts to its no-transceiver antenna.
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ async def run(cfg: Config, bind_host: str) -> None:
     try:
         await asyncio.gather(k4.run(), supervisor.run())
     finally:
-        await go_offline()   # on shutdown, let the stack fail safe to Dummy Load
+        await go_offline()   # on shutdown, let the stack fall back to its no-transceiver antenna
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -5,10 +5,11 @@ brings the virtual radio ONLINE (broadcast discovery + serve the Genius stack)
 or OFFLINE.
 
 Going OFFLINE tears down discovery AND drops all stack connections, so the stack
-sees the radio vanish exactly like a real Flex powering off — and the AGXL fails
-over to Dummy Load, grounding antenna inputs for lightning safety. Keeping a fake
-radio "present" while the K4 is off would defeat that failover, so this teardown
-is a safety requirement, not polish.
+sees the radio vanish exactly like a real Flex powering off — and each box reverts
+to its configured "no transceiver" antenna (set the AGXL's to a dummy load / a
+grounded port for lightning safety). Keeping a fake radio "present" while the K4
+is off would defeat that failover, so this teardown is a safety requirement, not
+polish.
 """
 from __future__ import annotations
 
@@ -54,7 +55,7 @@ class Supervisor:
             elif not present and self._online:
                 pending_since = now if pending_since is None else pending_since
                 if now - pending_since >= self.absent_after:
-                    log.warning("K4 absent -> OFFLINE (dropping stack; AGXL -> Dummy Load)")
+                    log.warning("K4 absent -> OFFLINE (dropping stack; boxes revert to no-transceiver antenna)")
                     await self.go_offline()
                     self._online = False
                     pending_since = None

@@ -6,7 +6,7 @@ package is the *server* half. It answers discovery, accepts the connection,
 handles the amplifier/meter/interlock registration the PGXL performs on connect,
 and streams slice frequency/mode/TX sourced natively from the K4's CAT port. A
 presence supervisor tears the whole thing down when the K4 is absent, so the
-stack fails over to Dummy Load like a real Flex powering off.
+stack reverts to its no-transceiver antenna, like a real Flex powering off.
 """
 
 __version__ = "0.2.0"
