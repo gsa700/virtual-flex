@@ -60,6 +60,13 @@ class ClientSession:
     def _ok(self, seq: str, message: str = "") -> None:
         self.send_line(f"R{seq}|0|{message}")
 
+    def close(self) -> None:
+        """Drop this connection; run()'s reader wakes on EOF and cleans up."""
+        try:
+            self.writer.close()
+        except OSError:
+            pass
+
     # --- lifecycle ------------------------------------------------------------
     async def run(self) -> None:
         self.radio.add_client(self)

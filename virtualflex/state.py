@@ -91,6 +91,18 @@ class Radio:
     def remove_client(self, client: "ClientSession") -> None:
         self.clients.discard(client)
 
+    def drop_all_clients(self) -> None:
+        """Close every stack connection and clear their registrations. Called when
+        the K4 goes absent: the stack sees the radio vanish (like a real Flex
+        powering off) and the AGXL fails over to Dummy Load."""
+        for client in list(self.clients):
+            client.close()
+        self.clients.clear()
+        self.amplifiers.clear()
+        self.meters.clear()
+        self.interlocks.clear()
+        self._next_meter = 1
+
     def _send_to_slice_subs(self, line: str) -> None:
         for client in list(self.clients):
             if client.subscribed("slice"):

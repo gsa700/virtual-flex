@@ -1,52 +1,30 @@
-# virtual-flex configuration. Copy to config.toml and edit.
+# virtual-flex v0.2 configuration.
+# Copy to config.toml and edit. v0.2 is K4-only and native — no hamlib/rigctld.
+# (The install wizard will write this for you; shown here for manual/dev use.)
 # Run with:  python -m virtualflex --config config.toml
 
 [radio]
-# Values advertised in the VITA-49 discovery broadcast.
-# IMPORTANT: the PGXL matches `serial` against the FlexRadio serial you pair it
-# with (its `flexradio ... serial=` setting), so this MUST equal that value.
-# "auto" (the default) derives it from the K4 hostname in [ptt.k4cat].host
-# (e.g. K4-SN00895 -> 8600-0000-0000-0895) and logs it at startup; pair the
-# stack to whatever it logs. Set an explicit serial to pin it (recommended once
-# paired, so a K4 rename can't change it). During bring-up you can also use your
-# real FLEX-8600's serial and the amp accepts it without question.
 model    = "FLEX-8600"
-serial   = "auto"
-version  = "3.6.19.35"   # firmware/SmartSDR version string; match a real 8600 if the PGXL validates it (confirm from capture)
-name     = "VirtualFlex"
-nickname = "VirtualFlex"
+serial   = "auto"          # "auto" derives from k4.hostname (K4-SN00895 -> 8600-0000-0000-0895)
+version  = "3.6.19.35"     # SmartSDR version string the stack sees
+nickname = "VirtualFlex"   # the name shown in SmartSDR / the Genius apps
 callsign = "AB0R"
 
 [network]
-command_port      = 4992              # TCP command/status port the amp connects to (FlexRadio standard)
-discovery_port    = 4992              # UDP discovery broadcast port (confirm 4992 vs 4991 from capture)
-broadcast_address = "255.255.255.255" # use a subnet-directed bcast (e.g. 192.168.0.255) if your stack needs it
-discovery_interval = 1.0             # seconds between discovery broadcasts
-advertise_ip      = ""               # IP the amp connects back to; blank = autodetect
+command_port      = 4992
+discovery_port    = 4992
+broadcast_address = "10.0.1.255"   # subnet-directed broadcast; the host must share the stack's subnet
+advertise_ip      = ""              # blank = auto-detect this host's LAN IP
 
-[rig]
-source = "sim"   # "sim" for Phase-1 bring-up, "hamlib" to follow a real radio via rigctld
+[k4]
+ip        = "10.0.1.105"            # cached address; self-refreshed via mDNS if it stops answering
+hostname  = "K4-SN00895.local"     # identity (pins the serial) + mDNS IP-refresh source
+cat_port  = 9200
+ptt_interval  = 0.003              # fast TQX poll for low-latency keying
+freq_interval = 0.1                # FA/FB/FT/MD poll
+stale_after   = 3.0                # no valid CAT response for this long => treat the K4 as absent
 
-[rig.sim]
-frequency        = 14074000  # Hz reported by the fake radio
-mode             = "USB"
-sweep_hz_per_sec = 0         # >0 slowly sweeps the band so you can watch the amp/tuner follow
-
-[rig.hamlib]
-# Start rigctld pointed at your K4 first. A K4-SN<serial>.local mDNS name works
-# and is DHCP-proof (needs libnss-mdns+avahi on Linux); a raw IP is fine too:
-#   rigctld -m <K4_model> -r K4-SN<serial>.local:9200 -t 4532
-host          = "127.0.0.1"
-port          = 4532
-poll_interval = 0.1
-
-[ptt]
-# Transmit detection so the 4O3A stack knows when we key (for LAN PTT).
-#   "none"  = interlock stays RECEIVE (band data only, no keying)
-#   "k4cat" = detect Elecraft K4 TX directly over its CAT port (low latency)
-source = "none"
-
-[ptt.k4cat]
-host          = "K4-SNxxxxx.local"  # K4 mDNS name (K4-SN<serial>.local, DHCP-proof) or IP; needs libnss-mdns+avahi on Linux
-port          = 9200
-poll_interval = 0.01         # 10 ms fast poll of TQX
+[presence]
+present_after = 3.0                # K4 reachable this long before we advertise to the stack
+absent_after  = 5.0                # K4 gone this long before we drop the stack (-> AGXL Dummy Load)
+poll_interval = 0.5
