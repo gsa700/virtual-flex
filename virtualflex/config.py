@@ -1,4 +1,9 @@
-"""Configuration loading (TOML) with defaults. Stdlib ``tomllib`` only."""
+"""Configuration loading (TOML) with defaults. Stdlib ``tomllib`` only.
+
+v0.2 is K4-only: the rig is reached natively over the K4 CAT port, so there is
+no hamlib/rig/ptt configuration — just how to find the K4 ([k4]) and how eagerly
+to declare it present/absent ([presence]).
+"""
 from __future__ import annotations
 
 import copy
@@ -11,11 +16,11 @@ from pathlib import Path
 _DEFAULTS: dict = {
     "radio": {
         "model": "FLEX-8600",
-        "serial": "1234-5678-9012-3456",
+        "serial": "auto",          # "auto" -> derive from the K4 hostname
         "version": "3.6.19.35",
         "name": "VirtualFlex",
         "nickname": "VirtualFlex",
-        "callsign": "AB0R",
+        "callsign": "",
     },
     "network": {
         "command_port": 4992,
@@ -24,14 +29,18 @@ _DEFAULTS: dict = {
         "discovery_interval": 1.0,
         "advertise_ip": "",
     },
-    "rig": {
-        "source": "sim",
-        "sim": {"frequency": 14074000, "mode": "USB", "sweep_hz_per_sec": 0},
-        "hamlib": {"host": "127.0.0.1", "port": 4532, "poll_interval": 0.1},
+    "k4": {
+        "ip": "",                  # cached address; self-refreshed via mDNS on failure
+        "hostname": "",            # K4-SN<serial>.local — identity + mDNS refresh
+        "cat_port": 9200,
+        "ptt_interval": 0.003,     # fast TQX poll for low-latency keying
+        "freq_interval": 0.1,      # FA/FB/FT/MD poll
+        "stale_after": 3.0,        # no valid response for this long => "absent"
     },
-    "ptt": {
-        "source": "none",  # "none" = interlock stays RECEIVE; "k4cat" = detect K4 TX over CAT
-        "k4cat": {"host": "127.0.0.1", "port": 9200, "poll_interval": 0.01},
+    "presence": {
+        "present_after": 3.0,      # K4 present this long before we advertise
+        "absent_after": 5.0,       # K4 absent this long before we drop the stack
+        "poll_interval": 0.5,
     },
 }
 
@@ -50,8 +59,8 @@ def _deep_merge(base: dict, over: dict) -> dict:
 class Config:
     radio: dict = field(default_factory=dict)
     network: dict = field(default_factory=dict)
-    rig: dict = field(default_factory=dict)
-    ptt: dict = field(default_factory=dict)
+    k4: dict = field(default_factory=dict)
+    presence: dict = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path | None) -> "Config":
@@ -60,7 +69,7 @@ class Config:
             with open(path, "rb") as fh:
                 data = _deep_merge(data, tomllib.load(fh))
         return cls(radio=data["radio"], network=data["network"],
-                   rig=data["rig"], ptt=data["ptt"])
+                   k4=data["k4"], presence=data["presence"])
 
     def advertise_ip(self) -> str:
         configured = self.network.get("advertise_ip") or ""
@@ -70,26 +79,21 @@ class Config:
         """Resolve the advertised serial, returning ``(serial, note)``.
 
         If ``radio.serial`` is blank or ``"auto"``, derive it from the K4's
-        hostname in ``[ptt.k4cat].host`` (e.g. ``K4-SN01234`` -> the K4 serial).
-        Otherwise the configured value is used verbatim. On failure to derive we
-        fall back to the built-in placeholder so the app still starts.
+        ``[k4].hostname`` (e.g. ``K4-SN01234`` -> ``8600-0000-0000-1234``).
+        Otherwise the configured value is used verbatim.
         """
         configured = str(self.radio.get("serial", "")).strip()
         if configured and configured.lower() != "auto":
             return configured, "configured"
 
-        host = ""
-        if str(self.ptt.get("source", "none")).lower() == "k4cat":
-            host = str(self.ptt.get("k4cat", {}).get("host", ""))
+        host = str(self.k4.get("hostname", ""))
         derived = derive_flex_serial(str(self.radio.get("model", "")), host)
         if derived:
             return derived, f"auto-derived from K4 hostname '{host}'"
 
-        placeholder = _DEFAULTS["radio"]["serial"]
-        return placeholder, (
-            "could not auto-derive a serial (no K4-SN<n> hostname on "
-            f"ptt.k4cat.host='{host}', source={self.ptt.get('source')}) - "
-            "using placeholder; set radio.serial explicitly")
+        return "0000-0000-0000-0000", (
+            f"could not auto-derive a serial (no K4-SN<n> in k4.hostname='{host}') "
+            "- set radio.serial explicitly")
 
 
 def derive_flex_serial(model: str, host: str) -> str | None:
@@ -97,9 +101,9 @@ def derive_flex_serial(model: str, host: str) -> str | None:
 
     Elecraft K4s answer mDNS as ``K4-SN<digits>`` (e.g. ``K4-SN01234.local``).
     We take those digits as the low bits and prefix the emulated model number,
-    e.g. model ``FLEX-8600`` + ``K4-SN01234`` -> ``8600-0000-0000-1234``. The
-    model prefix can't collide with a real 8600 serial (those start with a year
-    like ``1926``), and the tail is recognizably the operator's K4.
+    e.g. ``FLEX-8600`` + ``K4-SN01234`` -> ``8600-0000-0000-1234``. The model
+    prefix can't collide with a real 8600 serial (those start with a year like
+    ``1926``), and the tail is recognizably the operator's K4.
 
     Returns ``None`` if no ``SN<digits>`` is present (e.g. host is a raw IP).
     """

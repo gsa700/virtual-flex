@@ -18,9 +18,9 @@ def test_derive_model_without_digits_uses_zero_prefix():
     assert derive_flex_serial("FLEX", "K4-SN7") == "0000-0000-0000-0007"
 
 
-def test_resolve_auto_uses_k4cat_host():
+def test_resolve_auto_uses_k4_hostname():
     cfg = Config(radio={"model": "FLEX-8600", "serial": "auto"}, network={},
-                 rig={}, ptt={"source": "k4cat", "k4cat": {"host": "K4-SN01234.local"}})
+                 k4={"hostname": "K4-SN01234.local"}, presence={})
     serial, note = cfg.resolve_serial()
     assert serial == "8600-0000-0000-1234"
     assert "auto-derived" in note
@@ -28,13 +28,13 @@ def test_resolve_auto_uses_k4cat_host():
 
 def test_resolve_explicit_serial_is_kept():
     cfg = Config(radio={"model": "FLEX-8600", "serial": "1900-0000-0000-0001"},
-                 network={}, rig={}, ptt={})
+                 network={}, k4={}, presence={})
     assert cfg.resolve_serial() == ("1900-0000-0000-0001", "configured")
 
 
 def test_resolve_auto_without_hostname_falls_back_to_placeholder():
     cfg = Config(radio={"model": "FLEX-8600", "serial": "auto"}, network={},
-                 rig={}, ptt={"source": "k4cat", "k4cat": {"host": "192.0.2.105"}})
+                 k4={"hostname": "192.0.2.105"}, presence={})
     serial, note = cfg.resolve_serial()
-    assert serial == "1234-5678-9012-3456"
+    assert serial == "0000-0000-0000-0000"
     assert "could not auto-derive" in note

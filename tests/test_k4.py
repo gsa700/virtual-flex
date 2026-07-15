@@ -14,12 +14,24 @@ class MockK4:
         self.tq = "0"             # not keyed
         self.server = None
         self.port = None
+        self.conns = []           # live client writers, so we can simulate power-off
 
     async def start(self):
         self.server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
         self.port = self.server.sockets[0].getsockname()[1]
 
+    def kill(self):
+        """Simulate the K4 powering off: drop live connections + stop listening."""
+        for w in list(self.conns):
+            try:
+                w.close()
+            except OSError:
+                pass
+        if self.server is not None:
+            self.server.close()
+
     async def _handle(self, reader, writer):
+        self.conns.append(writer)
         buf = ""
         try:
             while True:
@@ -31,8 +43,13 @@ class MockK4:
                     cmd, _, buf = buf.partition(";")
                     self._reply(writer, cmd.strip())
                 await writer.drain()
-        except (ConnectionError, asyncio.CancelledError):
+        except (ConnectionError, asyncio.CancelledError, OSError):
             pass
+        finally:
+            try:
+                writer.close()          # close on EOF so wait_closed() can return
+            except OSError:
+                pass
 
     def _reply(self, writer, cmd):
         table = {"FA": f"FA{self.fa};", "FB": f"FB{self.fb};", "FT": f"FT{self.ft};",
@@ -42,7 +59,10 @@ class MockK4:
 
     async def stop(self):
         self.server.close()
-        await self.server.wait_closed()
+        try:
+            await asyncio.wait_for(self.server.wait_closed(), 2.0)
+        except (asyncio.TimeoutError, OSError):
+            pass
 
 
 async def _run_briefly(client, ready, tries=100, step=0.02):
