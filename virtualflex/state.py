@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("virtualflex.state")
 
-# hamlib/rigctld mode string -> FlexRadio slice mode string.
+# Normalize an incoming mode string (from the native K4 client) to a canonical
+# FlexRadio slice mode.
 MODE_MAP = {
     "USB": "USB", "LSB": "LSB", "CW": "CW", "CWR": "CW",
     "AM": "AM", "FM": "FM", "FMN": "NFM",

@@ -15,8 +15,9 @@ no hamlib.
 
 ## Status: working
 
-Validated end‑to‑end against a real K4D **and** a real 4O3A PGXL/TGXL/AGXL stack
-(cross‑checked against a genuine FLEX‑8600):
+Shipped as **v0.2.0** and validated end‑to‑end against a real K4D **and** a real
+4O3A PGXL/TGXL/AGXL stack (cross‑checked against a genuine FLEX‑8600) — including
+a clean install from a bare Debian image:
 
 - **Band‑follow** — all three boxes track the K4's frequency/mode (split follows VFO B).
 - **LAN keying** — the whole stack keys over LAN, including the amp, via the
@@ -24,7 +25,11 @@ Validated end‑to‑end against a real K4D **and** a real 4O3A PGXL/TGXL/AGXL s
   `amplifier=`). No RCA/keyline required.
 - **Lightning‑safety failover** — when the K4 powers off, virtual‑flex disappears
   like a real Flex would, so the **AGXL fails over to Dummy Load** and grounds the
-  antennas. Recovers automatically when the K4 comes back.
+  antennas.
+- **Fast recovery** — on K4 power‑up the stack reconnects within a couple of
+  seconds; in on‑air use it's indistinguishable from a real FLEX‑8600 coming back.
+- **Quiet on the network** — one CAT socket to the K4, addressed by IP, so
+  steady‑state DNS traffic is zero (no repeated `.local` lookups).
 
 ## How it works
 
