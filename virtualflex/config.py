@@ -17,7 +17,7 @@ _DEFAULTS: dict = {
     "radio": {
         "model": "FLEX-8600",
         "serial": "auto",          # "auto" -> derive from the K4 hostname
-        "version": "3.6.19.35",
+        "version": "4.2.20.41343",   # match current 8600 firmware; a 4.x Maestro may balk at a 3.x radio
         "name": "VirtualFlex",
         "nickname": "VirtualFlex",
         "callsign": "",

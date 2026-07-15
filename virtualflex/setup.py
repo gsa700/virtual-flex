@@ -22,7 +22,7 @@ from .config import derive_flex_serial, detect_local_ip
 
 CONFIG_PATH = "/etc/virtual-flex/config.toml"
 _MODEL = "FLEX-8600"
-_VERSION = "3.6.19.35"
+_VERSION = "4.2.20.41343"
 
 
 def subnet_broadcast(ip: str) -> str:
