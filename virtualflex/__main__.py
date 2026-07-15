@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sys
 
 from . import __version__, mdns
 from .config import Config
@@ -98,6 +99,10 @@ async def run(cfg: Config, bind_host: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "setup":
+        from . import setup
+        raise SystemExit(setup.run(argv[1:]))
     args = parse_args(argv)
     logging.basicConfig(
         level=getattr(logging, args.log_level),
