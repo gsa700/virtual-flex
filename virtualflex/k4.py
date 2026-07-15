@@ -30,13 +30,12 @@ PttCallback = Callable[[bool], None]        # keyed?
 
 
 class K4Client:
-    _MIN_BACKOFF = 2.0
-    _MAX_BACKOFF = 10.0    # low cap so the stack recovers quickly on K4 power-up
-    _MDNS_EVERY = 4        # re-resolve the IP only every Nth failure (fast same-IP recovery)
-
-    @classmethod
-    def _next_backoff(cls, delay: float) -> float:
-        return min(delay * 2, cls._MAX_BACKOFF)
+    # While the K4 is absent we retry the cached IP at a short, FIXED interval
+    # (connecting to an IP is cheap and DNS-free), so the stack recovers within
+    # seconds of the K4 finishing its boot — no exponential backoff to sit out.
+    _RETRY_INTERVAL = 3.0     # steady reconnect poll while the K4 is unreachable
+    _RECONNECT_DELAY = 1.0    # brief pause after a live link drops
+    _MDNS_EVERY = 5           # re-resolve the IP every Nth failed try (catch DHCP changes)
 
     def __init__(self, *, ip: str, port: int = 9200, hostname: str | None = None,
                  ptt_interval: float = 0.003, freq_interval: float = 0.1,
@@ -76,7 +75,6 @@ class K4Client:
 
     # ---- lifecycle ----------------------------------------------------------
     async def run(self) -> None:
-        backoff = self._MIN_BACKOFF
         fails = 0
         while True:
             self._connected_this_session = False
@@ -86,23 +84,19 @@ class K4Client:
                 log.debug("K4 session ended: %s", exc)
             self._connected = False
             if self._connected_this_session:
-                # a live link dropped — reconnect to the same IP promptly
-                backoff, fails = self._MIN_BACKOFF, 0
-                await asyncio.sleep(backoff)
+                fails = 0
+                await asyncio.sleep(self._RECONNECT_DELAY)
                 continue
-            # never connected this round (radio off / unreachable). Retry the
-            # cached IP with capped backoff; only re-resolve via mDNS every few
-            # tries, so ordinary power-up recovery isn't slowed by a lookup.
+            # absent: retry the cached IP at a steady, short interval. Re-resolve
+            # via mDNS only occasionally, to catch a DHCP address change.
             fails += 1
             if self.hostname and fails % self._MDNS_EVERY == 0:
                 new_ip = await self._refresh_ip()
                 if new_ip and new_ip != self.ip:
                     log.info("K4 address changed %s -> %s (mDNS)", self.ip, new_ip)
                     self.ip = new_ip
-                    backoff = self._MIN_BACKOFF
                     continue
-            await asyncio.sleep(backoff)
-            backoff = self._next_backoff(backoff)
+            await asyncio.sleep(self._RETRY_INTERVAL)
 
     async def _refresh_ip(self) -> str | None:
         if not self.hostname:
