@@ -54,8 +54,11 @@ class DiscoveryBroadcaster:
             # but won't casually connect — we can't serve panadapters/DAX, only
             # the Genius boxes' slice/interlock diet. Semi-truthful: the bridge
             # IS this radio's station.
+            # Single-seat radio with the seat taken: SmartSDR derives availability
+            # from licensed seats vs the gui_client list (not available_clients),
+            # so 2 seats + 1 station still read "Available (MultiFLEX)".
             "wan_connected=0",
-            "licensed_clients=2",
+            "licensed_clients=1",
             "available_clients=0",
             "max_panadapters=4",
             "available_panadapters=0",
