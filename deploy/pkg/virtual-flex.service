@@ -1,7 +1,7 @@
 [Unit]
-Description=virtual-flex (FlexRadio emulator for the 4O3A stack)
-After=network-online.target virtual-flex-rigctld.service
-Wants=network-online.target virtual-flex-rigctld.service
+Description=virtual-flex (native Elecraft K4 -> 4O3A Genius stack)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 WorkingDirectory=/usr/lib/virtual-flex
