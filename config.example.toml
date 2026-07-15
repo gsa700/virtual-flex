@@ -25,6 +25,6 @@ freq_interval = 0.1                # FA/FB/FT/MD poll
 stale_after   = 3.0                # no valid CAT response for this long => treat the K4 as absent
 
 [presence]
-present_after = 3.0                # K4 reachable this long before we advertise to the stack
+present_after = 1.0                # K4 reachable this long before we advertise to the stack
 absent_after  = 5.0                # K4 gone this long before we drop the stack (-> AGXL Dummy Load)
-poll_interval = 0.5
+poll_interval = 0.25

@@ -33,7 +33,9 @@ class K4Client:
     # While the K4 is absent we retry the cached IP at a short, FIXED interval
     # (connecting to an IP is cheap and DNS-free), so the stack recovers within
     # seconds of the K4 finishing its boot — no exponential backoff to sit out.
-    _RETRY_INTERVAL = 3.0     # steady reconnect poll while the K4 is unreachable
+    _CONNECT_TIMEOUT = 2.0    # bound each connect: a powered-off host makes the OS
+                              # retransmit SYN for ~2 min otherwise, stalling recovery
+    _RETRY_INTERVAL = 1.0     # steady reconnect poll while the K4 is unreachable
     _RECONNECT_DELAY = 1.0    # brief pause after a live link drops
     _MDNS_EVERY = 5           # re-resolve the IP every Nth failed try (catch DHCP changes)
 
@@ -108,7 +110,8 @@ class K4Client:
             return None
 
     async def _session(self) -> None:
-        reader, writer = await asyncio.open_connection(self.ip, self.port)
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(self.ip, self.port), self._CONNECT_TIMEOUT)
         self._connected = True
         self._connected_this_session = True
         self._last_rx = asyncio.get_running_loop().time()

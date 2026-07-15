@@ -38,9 +38,9 @@ _DEFAULTS: dict = {
         "stale_after": 3.0,        # no valid response for this long => "absent"
     },
     "presence": {
-        "present_after": 3.0,      # K4 present this long before we advertise
-        "absent_after": 5.0,       # K4 absent this long before we drop the stack
-        "poll_interval": 0.5,
+        "present_after": 1.0,      # K4 present this long before we advertise (snappy recovery)
+        "absent_after": 5.0,       # K4 absent this long before we drop the stack (avoid nuisance switches)
+        "poll_interval": 0.25,
     },
 }
 
