@@ -78,6 +78,16 @@ async def _run_briefly(client, ready, tries=100, step=0.02):
         pass
 
 
+def test_k4_backoff_climbs_and_caps_low():
+    d, seen = K4Client._MIN_BACKOFF, []
+    for _ in range(6):
+        seen.append(d)
+        d = K4Client._next_backoff(d)
+    assert seen[0] == 2.0
+    assert max(seen) == K4Client._MAX_BACKOFF == 10.0   # low cap -> quick recovery
+    assert K4Client._next_backoff(K4Client._MAX_BACKOFF) == K4Client._MAX_BACKOFF
+
+
 def test_k4_reads_tx_freq_mode_and_ptt():
     async def scenario():
         srv = MockK4()

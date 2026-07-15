@@ -31,7 +31,12 @@ PttCallback = Callable[[bool], None]        # keyed?
 
 class K4Client:
     _MIN_BACKOFF = 2.0
-    _MAX_BACKOFF = 60.0
+    _MAX_BACKOFF = 10.0    # low cap so the stack recovers quickly on K4 power-up
+    _MDNS_EVERY = 4        # re-resolve the IP only every Nth failure (fast same-IP recovery)
+
+    @classmethod
+    def _next_backoff(cls, delay: float) -> float:
+        return min(delay * 2, cls._MAX_BACKOFF)
 
     def __init__(self, *, ip: str, port: int = 9200, hostname: str | None = None,
                  ptt_interval: float = 0.003, freq_interval: float = 0.1,
@@ -72,6 +77,7 @@ class K4Client:
     # ---- lifecycle ----------------------------------------------------------
     async def run(self) -> None:
         backoff = self._MIN_BACKOFF
+        fails = 0
         while True:
             self._connected_this_session = False
             try:
@@ -81,17 +87,22 @@ class K4Client:
             self._connected = False
             if self._connected_this_session:
                 # a live link dropped — reconnect to the same IP promptly
-                await asyncio.sleep(self._MIN_BACKOFF)
+                backoff, fails = self._MIN_BACKOFF, 0
+                await asyncio.sleep(backoff)
                 continue
-            # never connected: the cached IP may be stale — try to relearn it
-            new_ip = await self._refresh_ip()
-            if new_ip and new_ip != self.ip:
-                log.info("K4 address changed %s -> %s (mDNS)", self.ip, new_ip)
-                self.ip = new_ip
-                backoff = self._MIN_BACKOFF
-                continue
+            # never connected this round (radio off / unreachable). Retry the
+            # cached IP with capped backoff; only re-resolve via mDNS every few
+            # tries, so ordinary power-up recovery isn't slowed by a lookup.
+            fails += 1
+            if self.hostname and fails % self._MDNS_EVERY == 0:
+                new_ip = await self._refresh_ip()
+                if new_ip and new_ip != self.ip:
+                    log.info("K4 address changed %s -> %s (mDNS)", self.ip, new_ip)
+                    self.ip = new_ip
+                    backoff = self._MIN_BACKOFF
+                    continue
             await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, self._MAX_BACKOFF)
+            backoff = self._next_backoff(backoff)
 
     async def _refresh_ip(self) -> str | None:
         if not self.hostname:
