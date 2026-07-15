@@ -1,7 +1,7 @@
 [project]
 name = "virtual-flex"
-version = "0.1.3"
-description = "A virtual FlexRadio: lets a hamlib-controlled rig drive the 4O3A PGXL/TGXL/AGXL stack as if it were a FLEX-6000/8000."
+version = "0.2.0"
+description = "A virtual FlexRadio: lets an Elecraft K4/K4D drive the 4O3A PGXL/TGXL/AGXL stack over the LAN as if it were a FLEX-8600."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0-or-later" }
