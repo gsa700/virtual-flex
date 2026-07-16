@@ -91,6 +91,11 @@ cat > "$STAGE/DEBIAN/postrm" <<'EOF'
 #!/bin/sh
 set -e
 systemctl daemon-reload >/dev/null 2>&1 || true
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+  # Runtime-generated __pycache__ isn't in the package manifest, so dpkg
+  # leaves it behind and the install dir gets orphaned — sweep it ourselves.
+  rm -rf /usr/lib/virtual-flex
+fi
 if [ "$1" = purge ]; then
   rm -rf /etc/virtual-flex
 fi
