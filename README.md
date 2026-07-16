@@ -91,6 +91,7 @@ time to change settings — every prompt pre‑fills from the existing config, s
 you press Enter through what you're keeping. No TOML editing, ever.
 
 Watch it: `journalctl -u virtual-flex -f`.
+On-box docs: `man virtual-flex` (or `virtual-flex --help`).
 
 ### Updating
 

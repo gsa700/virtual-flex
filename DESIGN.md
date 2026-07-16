@@ -67,8 +67,11 @@ blank means keep).
 Meaningful keys: `radio.serial`/`radio.nickname`/`radio.callsign`,
 `network.broadcast_address`, `k4.ip` (cached address), `k4.hostname` (identity +
 mDNS self-heal). The `.deb` depends only on `python3 (>= 3.11)` and ships a
-`/usr/bin/virtual-flex` wrapper so the wizard is on PATH; the config is generated,
-not a dpkg conffile, so upgrades never prompt or clobber it.
+`/usr/bin/virtual-flex` wrapper so the wizard is on PATH, plus a man page
+(`deploy/pkg/virtual-flex.1` → `/usr/share/man/man1/`); `--help` documents the
+setup/update commands (they dispatch before argparse, so the epilog carries
+them). The config is generated, not a dpkg conffile, so upgrades never prompt
+or clobber it.
 
 ## Module layout
     __main__.py    entry: `setup` subcommand -> wizard; else load config -> Supervisor
