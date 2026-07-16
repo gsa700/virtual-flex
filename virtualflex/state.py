@@ -6,6 +6,7 @@ object's ``freq`` (not the slice), so a minimal slice alone leaves it at "N/A".
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -73,6 +74,14 @@ class Radio:
         self._next_handle = 0x40000000  # object handles/stream ids start high, like SmartSDR
         self._next_meter = 1
         self.transmitting = False  # global TX state, surfaced via the interlock object
+        # Pacing buffer for runtime deltas: a real Flex streams evenly from its
+        # own DSP; our sources (AI2 pushes + polls) arrive bursty. Coalesce and
+        # emit the LATEST values on a fixed cadence — leading edge immediate,
+        # so a single change has zero added latency. PTT is never paced.
+        self._pace = 0.05
+        self._pending: dict[int, dict[str, bool]] = {}   # slice index -> changed flags
+        self._emit_handle: asyncio.TimerHandle | None = None
+        self._last_emit = 0.0
 
     # --- object id allocation -------------------------------------------------
     def alloc_handle(self) -> int:
@@ -103,6 +112,10 @@ class Radio:
         self.meters.clear()
         self.interlocks.clear()
         self._next_meter = 1
+        if self._emit_handle is not None:      # cancel any queued paced emit
+            self._emit_handle.cancel()
+            self._emit_handle = None
+        self._pending.clear()
 
     def _send_to_slice_subs(self, line: str) -> None:
         for client in list(self.clients):
@@ -147,23 +160,61 @@ class Radio:
         log.debug("slice %d -> %.6f MHz %s tx=%d",
                   index, sl.freq_hz / 1e6, sl.mode, sl.tx)
         if structural:
-            # Rare (tx designation moved): resend the full picture.
+            # Rare (tx designation moved): flush pacing state, resend the full picture.
+            self._pending.pop(index, None)
             self.broadcast_slice(index)
             return
-        # Runtime deltas, like a real Flex: only the changed keys. The Genius
-        # boxes are embedded parsers — full ~1 KB dumps per dial click were the
-        # bottleneck that made the display trail the dial.
-        slice_delta = [f"S0|slice {sl.index}"]
-        tx_delta = ["S0|transmit"]
-        if freq_changed:
-            mhz = f"{sl.freq_hz / 1_000_000:.6f}"
-            slice_delta.append(f"RF_frequency={mhz}")
-            tx_delta.append(f"freq={mhz}")
-        if mode_changed:
-            slice_delta.append(f"mode={sl.mode}")
-            tx_delta.append(f"tx_slice_mode={sl.mode}")
-        self._send_to_slice_subs(" ".join(slice_delta))
-        self._send_to_slice_subs(" ".join(tx_delta))
+        # Runtime change: mark what changed and let the paced emitter send it.
+        flags = self._pending.setdefault(index, {"freq": False, "mode": False})
+        flags["freq"] |= freq_changed
+        flags["mode"] |= mode_changed
+        self._schedule_emit()
+
+    # --- paced delta emitter ---------------------------------------------------
+    def _schedule_emit(self) -> None:
+        """Emit now if we've been quiet for a pace interval (leading edge);
+        otherwise coalesce onto the next tick (trailing edge). Falls back to
+        immediate emission when no event loop is running (sync callers/tests)."""
+        if self._emit_handle is not None:
+            return                                   # tick already scheduled
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._emit_pending()
+            return
+        delay = self._pace - (loop.time() - self._last_emit)
+        if delay <= 0:
+            self._emit_pending()
+        else:
+            self._emit_handle = loop.call_later(delay, self._emit_pending)
+
+    def _emit_pending(self) -> None:
+        """Send one terse delta per pending slice, built from CURRENT state —
+        intermediate values that arrived within the pace window are skipped.
+        Runtime deltas carry only the changed keys, like a real Flex: the Genius
+        boxes are embedded parsers, and full ~1 KB dumps per dial click were the
+        bottleneck that made the display trail the dial."""
+        self._emit_handle = None
+        try:
+            self._last_emit = asyncio.get_running_loop().time()
+        except RuntimeError:
+            pass
+        pending, self._pending = self._pending, {}
+        for index, flags in pending.items():
+            sl = self.slices.get(index)
+            if sl is None:
+                continue
+            slice_delta = [f"S0|slice {sl.index}"]
+            tx_delta = ["S0|transmit"]
+            if flags["freq"]:
+                mhz = f"{sl.freq_hz / 1_000_000:.6f}"
+                slice_delta.append(f"RF_frequency={mhz}")
+                tx_delta.append(f"freq={mhz}")
+            if flags["mode"]:
+                slice_delta.append(f"mode={sl.mode}")
+                tx_delta.append(f"tx_slice_mode={sl.mode}")
+            self._send_to_slice_subs(" ".join(slice_delta))
+            self._send_to_slice_subs(" ".join(tx_delta))
 
     def broadcast_slice(self, index: int) -> None:
         sl = self.slices.get(index)
