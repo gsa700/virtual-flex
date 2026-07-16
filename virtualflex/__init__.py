@@ -9,4 +9,4 @@ presence supervisor tears the whole thing down when the K4 is absent, so the
 stack reverts to its no-transceiver antenna, like a real Flex powering off.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

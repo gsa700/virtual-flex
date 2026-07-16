@@ -82,6 +82,25 @@ not a dpkg conffile, so upgrades never prompt or clobber it.
 sim) and the standalone `ptt.py` (folded into `k4.py`). No `libhamlib-utils`
 dependency, no rigctld systemd unit. Tests use a mock K4 CAT server.
 
+## GUI clients (Maestro / SmartSDR)
+The discovery card carries the full 8600-style field set — a Maestro-class GUI
+client parses far more of it than the Genius boxes do, and missing keys wedged
+the 8600M's built-in panel at "please wait..." during its boot-time radio scan.
+We also advertise as a **single-seat radio whose seat is taken** (station
+"K4D-Bridge") with **`status=In_Use`** + the `inuse_ip`/`inuse_host` fields
+populated — `status` is the field SmartSDR's picker actually prints, and with
+it the radio lists as "In Use" rather than "Available (MultiFLEX)". The Genius
+boxes ignore all of it (verified: they pair, follow, and key with In_Use on
+the air).
+
+If an operator connects anyway, nothing breaks: they get slice/transmit status
+but no panadapter/DAX streams (an empty radio), and the Genius connections are
+unaffected. SmartSDR's "Disconnect" sends `client disconnect` for the advertised
+station handle — a no-op here, since that station is a fixture of the discovery
+card, not a real connection. The picker keeps showing K4D-Bridge seated: the
+occupant can't be kicked, by design. (Verified live against SmartSDR while the
+stack streamed on 80 m.)
+
 ## Possible future work
 - **CAT-sequenced PTT** (route software PTT through the bridge → interlock →
   `TX;`) to close the keying loop wire-free for software-initiated modes.
