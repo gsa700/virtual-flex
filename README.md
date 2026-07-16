@@ -58,8 +58,9 @@ transceiver" antenna.
 
 - Python **3.11+** (stdlib only — `asyncio` + `tomllib`, **no third‑party deps, no hamlib**)
 - An Elecraft **K4/K4D** with its Ethernet CAT port reachable
-- A host on the **same L2 subnet** as the 4O3A stack (discovery is a UDP
-  broadcast — bridge the VM/LXC/Pi NIC onto that LAN, don't route to it)
+- A host on the **same L2 subnet** as the 4O3A stack (discovery is UDP —
+  broadcast or unicast — and setup's scans cover the local /24; bridge the
+  VM/LXC/Pi NIC onto that LAN, don't route to it)
 
 ## Install (Debian/Ubuntu — VM, LXC, or Pi)
 
@@ -71,11 +72,23 @@ sudo apt install ./virtual-flex_<version>_all.deb   # depends only on python3 (>
 sudo virtual-flex setup                             # interactive: finds your K4, writes config, starts it
 ```
 
-`virtual-flex setup` resolves your K4 by serial over mDNS (or takes an IP),
-auto‑detects the subnet broadcast, **pins** the advertised Flex serial so a K4
-rename can never force a stack re‑pair, writes `/etc/virtual-flex/config.toml`,
-and offers to enable + start the service. Re‑run it any time to change settings —
-no TOML editing. Then pair the 4O3A boxes to the serial it prints.
+`virtual-flex setup` finds everything itself — typically the only thing you
+type is your callsign:
+
+- **Finds the K4**: press Enter to scan the subnet for radios (it reads each
+  hit's serial over CAT), or type the serial for a targeted mDNS lookup
+  (digits are zero‑padded automatically — `1234` finds `K4-SN01234`).
+- **Finds the Genius boxes**: scans for the PGXL / TGXL / AGXL management
+  ports and offers the found IPs as the unicast‑discovery default — press
+  Enter to be invisible to everything but your stack, or type `none` to
+  broadcast to the whole subnet instead.
+- **Pins** the advertised Flex serial (derived from the K4's), so a K4 rename
+  can never force a stack re‑pair; auto‑detects the subnet broadcast; writes
+  `/etc/virtual-flex/config.toml`; offers to enable + start the service.
+
+Then pair the 4O3A boxes to the serial it prints (one time). Re‑run setup any
+time to change settings — every prompt pre‑fills from the existing config, so
+you press Enter through what you're keeping. No TOML editing, ever.
 
 Watch it: `journalctl -u virtual-flex -f`.
 
@@ -88,6 +101,17 @@ virtual-flex update --check         # just report whether an update exists
 
 Your config is untouched by updates (it's generated, not packaged), and the
 service is only restarted if it was already running.
+
+### Uninstalling
+
+```bash
+sudo apt remove virtual-flex        # remove, but keep /etc/virtual-flex for a later reinstall
+sudo apt purge  virtual-flex        # remove everything, config included — no trace left
+```
+
+Both stop and disable the service. (A `'/lib/systemd/system' not empty`
+warning from dpkg is normal — that directory is shared by every package that
+ships a systemd unit.)
 
 ## Run from source (dev / other platforms)
 

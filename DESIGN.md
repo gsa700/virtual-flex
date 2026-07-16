@@ -53,10 +53,16 @@ resolves the K4 on a bare Debian with **no avahi/libnss-mdns installed**.
 ## Config & install
 The install wizard (`sudo virtual-flex setup`) writes a minimal
 `/etc/virtual-flex/config.toml`; anything it omits inherits the built-in defaults
-in `config.py`. It prompts for the K4 serial (or an IP), resolves
-`K4-SN<serial>.local` once over mDNS to learn the address, auto-detects the /24
-subnet broadcast, **pins** the derived Flex serial (`radio.serial`, so a K4
-rename can never force a stack re-pair), and offers to enable + start the service.
+in `config.py`. It finds the hardware itself: Enter at the serial prompt scans
+the /24 for radios with the CAT port open and reads each hit's serial over CAT
+(`SN;`); a typed serial (zero-padded) does a targeted mDNS resolve instead. It
+then scans for the Genius boxes' management ports (9007 AGXL / 9008 PGXL /
+9010 TGXL — all three live-confirmed) and offers the found IPs as the
+unicast-discovery default. It auto-detects the /24 subnet broadcast, **pins**
+the derived Flex serial (`radio.serial`, so a K4 rename can never force a stack
+re-pair), and offers to enable + start the service. Re-running setup pre-fills
+every prompt from the existing config ('none' clears the unicast list, since
+blank means keep).
 
 Meaningful keys: `radio.serial`/`radio.nickname`/`radio.callsign`,
 `network.broadcast_address`, `k4.ip` (cached address), `k4.hostname` (identity +
