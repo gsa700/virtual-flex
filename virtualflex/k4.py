@@ -1,11 +1,13 @@
 """Native Elecraft K4/K4D network-CAT client.
 
-A single connection to the K4's CAT port (9200). Enables auto-info (``AI2``) so
-the K4 **pushes** ``FA/FB/FT/MD`` changes the instant they happen — dial spins
-reach the stack event-driven, like a real Flex — with a slow poll kept only as
-a resync fallback. PTT stays on the fast ``TQX`` poll (its latency floor is the
-poll, and it must never depend on the push path). In split (``FT=1``) the
-transmit VFO is B, so the stack must follow ``FB``; otherwise ``FA``.
+A single connection to the K4's CAT port (9200). Frequency follow is a HYBRID:
+auto-info (``AI2``) makes the K4 push ``FA/FB/FT/MD`` the instant they change,
+AND a fast poll runs alongside — verified live that the K4 answers polls
+mid-spin more readily than it volunteers pushes, so together they give the
+densest dial follow the radio can report. PTT stays on the fast ``TQX`` poll
+(its latency floor is the poll, and it must never depend on the push path). In
+split (``FT=1``) the transmit VFO is B, so the stack must follow ``FB``;
+otherwise ``FA``.
 
 AI state is per-connection on the K4, so ``AI2`` here never affects a logger's
 own CAT session, and a reconnect re-arms it.
@@ -45,7 +47,7 @@ class K4Client:
     _MDNS_EVERY = 5           # re-resolve the IP every Nth failed try (catch DHCP changes)
 
     def __init__(self, *, ip: str, port: int = 9200, hostname: str | None = None,
-                 ptt_interval: float = 0.003, freq_interval: float = 2.0,
+                 ptt_interval: float = 0.003, freq_interval: float = 0.1,
                  stale_after: float = 3.0,
                  on_tx: TxCallback | None = None,
                  on_ptt: PttCallback | None = None) -> None:
@@ -127,9 +129,9 @@ class K4Client:
             writer.close()
 
     async def _writer_loop(self, writer: asyncio.StreamWriter) -> None:
-        # AI2 arms push mode: the K4 volunteers FA/FB/FT/MD the moment they
-        # change, so frequency follow is event-driven. The periodic FA/FB/FT/MD
-        # below is only a slow RESYNC in case a push is lost or AI is reset.
+        # AI2 arms push mode (K4 volunteers FA/FB/FT/MD on change) and the
+        # periodic poll below runs alongside it — the hybrid outperforms either
+        # alone (see module docstring).
         writer.write(b"AI2;FA;FB;FT;MD;TQX;")      # arm push mode + initial full read
         await writer.drain()
         every = max(1, round(self.freq_interval / self.ptt_interval))

@@ -130,28 +130,47 @@ class Radio:
     def update_slice(self, index: int = 0, *, freq_hz: int | None = None,
                      mode: str | None = None, tx: bool | None = None) -> None:
         sl = self.slices.setdefault(index, Slice(index=index))
-        changed = False
+        freq_changed = mode_changed = structural = False
         if freq_hz is not None and freq_hz != sl.freq_hz:
             sl.freq_hz = freq_hz
-            changed = True
+            freq_changed = True
         if mode is not None:
             mapped = MODE_MAP.get(mode.upper(), mode.upper())
             if mapped != sl.mode:
                 sl.mode = mapped
-                changed = True
+                mode_changed = True
         if tx is not None and tx != sl.tx:
             sl.tx = tx
-            changed = True
-        if changed:
-            log.debug("slice %d -> %.6f MHz %s tx=%d",
-                      index, sl.freq_hz / 1e6, sl.mode, sl.tx)
+            structural = True
+        if not (freq_changed or mode_changed or structural):
+            return
+        log.debug("slice %d -> %.6f MHz %s tx=%d",
+                  index, sl.freq_hz / 1e6, sl.mode, sl.tx)
+        if structural:
+            # Rare (tx designation moved): resend the full picture.
             self.broadcast_slice(index)
+            return
+        # Runtime deltas, like a real Flex: only the changed keys. The Genius
+        # boxes are embedded parsers — full ~1 KB dumps per dial click were the
+        # bottleneck that made the display trail the dial.
+        slice_delta = [f"S0|slice {sl.index}"]
+        tx_delta = ["S0|transmit"]
+        if freq_changed:
+            mhz = f"{sl.freq_hz / 1_000_000:.6f}"
+            slice_delta.append(f"RF_frequency={mhz}")
+            tx_delta.append(f"freq={mhz}")
+        if mode_changed:
+            slice_delta.append(f"mode={sl.mode}")
+            tx_delta.append(f"tx_slice_mode={sl.mode}")
+        self._send_to_slice_subs(" ".join(slice_delta))
+        self._send_to_slice_subs(" ".join(tx_delta))
 
     def broadcast_slice(self, index: int) -> None:
         sl = self.slices.get(index)
         if sl is None:
             return
-        # The amp follows the transmit object; send both so band + display track.
+        # Full status (subscribe time / structural change). The amp follows the
+        # transmit object; send both so band + display track.
         self._send_to_slice_subs(sl.status_line())
         self._send_to_slice_subs(self.transmit_status_line())
 
