@@ -1,10 +1,12 @@
+import asyncio
 import pathlib
 import tempfile
 import tomllib
 
 from virtualflex.config import Config
 from virtualflex.setup import (build_config, k4_serial_from_hostname,
-                               load_existing, subnet_broadcast)
+                               load_existing, normalize_k4_serial,
+                               scan_for_k4s, subnet_broadcast)
 
 
 def test_subnet_broadcast_slash24():
@@ -54,6 +56,52 @@ def test_load_existing_tolerates_missing_or_bad_file():
         p = pathlib.Path(tmp) / "config.toml"
         p.write_text("not [valid toml ===")
         assert load_existing(p) == {}               # fresh-install behavior
+
+
+def test_normalize_k4_serial_zero_pads():
+    # The K4 hostname pads to 5 digits: typing '1234' must find K4-SN01234.
+    assert normalize_k4_serial("1234") == "01234"
+    assert normalize_k4_serial("01234") == "01234"
+    assert normalize_k4_serial(" 42 ") == "00042"
+    assert normalize_k4_serial("123456") == "123456"   # >=5 digits untouched
+    assert normalize_k4_serial("ABC12") == "ABC12"     # non-digits untouched
+    assert normalize_k4_serial("") == ""
+
+
+def test_scan_finds_a_k4_and_reads_its_serial():
+    async def scenario():
+        async def cat(reader, writer):
+            data = await reader.read(16)
+            if b"SN;" in data:
+                writer.write(b"SN1234;")               # radio replies unpadded
+                await writer.drain()
+            writer.close()
+
+        srv = await asyncio.start_server(cat, "127.0.0.1", 0)
+        port = srv.sockets[0].getsockname()[1]
+        found = await scan_for_k4s("127.0.0.1", port=port, hosts=["127.0.0.1"])
+        srv.close()
+        assert found == [("127.0.0.1", "01234")]      # serial zero-padded
+
+    asyncio.run(scenario())
+
+
+def test_scan_skips_dead_hosts_keeps_silent_listeners():
+    async def scenario():
+        async def mute(reader, writer):
+            await reader.read(16)                     # accepts, never answers
+            writer.close()
+
+        srv = await asyncio.start_server(mute, "127.0.0.1", 0)
+        port = srv.sockets[0].getsockname()[1]
+        # 127.0.0.2 refuses (nothing listening) -> excluded entirely
+        found = await scan_for_k4s("127.0.0.1", port=port,
+                                   hosts=["127.0.0.1", "127.0.0.2"],
+                                   connect_timeout=0.3)
+        srv.close()
+        assert found == [("127.0.0.1", "")]           # listener w/o serial kept
+
+    asyncio.run(scenario())
 
 
 def test_build_config_merges_with_defaults():

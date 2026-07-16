@@ -44,6 +44,47 @@ def k4_serial_from_hostname(hostname: str) -> str:
     return m.group(1) if m else ""
 
 
+def normalize_k4_serial(serial: str) -> str:
+    """The K4's hostname zero-pads the serial to 5 digits (K4-SN01234), so
+    '1234' must become '01234' or the mDNS name won't exist."""
+    s = serial.strip()
+    return s.zfill(5) if s.isdigit() and len(s) < 5 else s
+
+
+async def scan_for_k4s(local_ip: str, *, port: int = 9200,
+                       connect_timeout: float = 0.6,
+                       hosts: list[str] | None = None) -> list[tuple[str, str]]:
+    """Probe the local /24 for radios: any host with the CAT port open is asked
+    for its serial over CAT (``SN;`` -> ``SNnnnnn;``). Returns [(ip, serial)];
+    serial is '' for a listener that didn't answer the query."""
+    base = local_ip.rsplit(".", 1)[0]
+
+    async def probe(ip: str) -> tuple[str, str] | None:
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(ip, port), connect_timeout)
+        except (OSError, asyncio.TimeoutError):
+            return None
+        serial = ""
+        try:
+            writer.write(b"SN;")
+            await writer.drain()
+            data = await asyncio.wait_for(reader.read(64), 1.5)
+            m = re.search(rb"SN(\d+)", data)
+            if m:
+                serial = m.group(1).decode().zfill(5)
+        except (OSError, asyncio.TimeoutError):
+            pass
+        finally:
+            writer.close()
+        return (ip, serial)
+
+    if hosts is None:
+        hosts = [f"{base}.{i}" for i in range(1, 255)]
+    hits = await asyncio.gather(*(probe(ip) for ip in hosts))
+    return [h for h in hits if h]
+
+
 def subnet_broadcast(ip: str) -> str:
     """Best-effort /24 subnet-directed broadcast for an IPv4 (192.0.2.14 ->
     10.0.1.255). The user can override at the prompt for other prefix lengths."""
@@ -119,8 +160,9 @@ def run(argv: list[str] | None = None) -> int:
         print(f"(pre-filled from {path} — Enter keeps the current value)\n")
 
     # --- locate the K4 ---
-    serial_in = _prompt("K4 serial (the digits in K4-SN..., blank to enter an IP instead)",
+    serial_in = _prompt("K4 serial (the digits in K4-SN..., blank to scan the network)",
                         k4_serial_from_hostname(str(ex_k4.get("hostname", ""))))
+    serial_in = normalize_k4_serial(serial_in)
     k4_hostname = k4_ip = ""
     if serial_in:
         k4_hostname = f"K4-SN{serial_in}.local"
@@ -130,11 +172,32 @@ def run(argv: list[str] | None = None) -> int:
             print(f"  found the K4 at {k4_ip}")
         else:
             print("  no mDNS answer (K4 off, or on another subnet)")
-            k4_ip = _prompt("  K4 IP address", str(ex_k4.get("ip", "")))
-    else:
+    if not k4_ip:
+        print(f"  scanning {local_ip.rsplit('.', 1)[0]}.0/24 for radios (CAT port open) ...")
+        found = asyncio.run(scan_for_k4s(local_ip))
+        for ip, sn in found:
+            print(f"  found a radio at {ip}" + (f" (serial {sn})" if sn else ""))
+        if len(found) == 1:
+            k4_ip, sn = found[0]
+            if sn and not serial_in:
+                serial_in = sn
+            k4_hostname = k4_hostname or (f"K4-SN{sn}.local" if sn else "")
+            if not _yes(f"Use the K4 at {k4_ip}?", default_no=False):
+                k4_ip = ""
+        elif found:
+            pick = _prompt("  which IP?", found[0][0])
+            match = next(((ip, sn) for ip, sn in found if ip == pick), None)
+            if match:
+                k4_ip = match[0]
+                if match[1]:
+                    k4_hostname = k4_hostname or f"K4-SN{match[1]}.local"
+        else:
+            print("  no radios answered (K4 off?)")
+    if not k4_ip:
         k4_ip = _prompt("K4 IP address", str(ex_k4.get("ip", "")))
-        k4_hostname = _prompt("K4 hostname for IP self-heal (optional, e.g. K4-SN01234.local)",
-                              str(ex_k4.get("hostname", "")))
+        k4_hostname = k4_hostname or _prompt(
+            "K4 hostname for IP self-heal (optional, e.g. K4-SN01234.local)",
+            str(ex_k4.get("hostname", "")))
     if not k4_ip and not k4_hostname:
         print("\nNeed at least a K4 IP or hostname — nothing written.")
         return 1
