@@ -26,6 +26,8 @@ _DEFAULTS: dict = {
         "command_port": 4992,
         "discovery_port": 4992,
         "broadcast_address": "255.255.255.255",
+        "discovery_targets": [],   # empty = broadcast; IPs = unicast only to those
+                                   # boxes (invisible to other pickers on the LAN)
         "discovery_interval": 1.0,
         "advertise_ip": "",
     },

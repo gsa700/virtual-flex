@@ -14,6 +14,10 @@ callsign = "AB0R"
 command_port      = 4992
 discovery_port    = 4992
 broadcast_address = "10.0.1.255"   # subnet-directed broadcast; the host must share the stack's subnet
+# Unicast discovery: list your Genius boxes' IPs and discovery goes ONLY to them —
+# the virtual radio disappears from SmartSDR/Maestro pickers entirely. Leave empty
+# (or omit) to broadcast. Pair new boxes in broadcast mode first, then pin IPs here.
+# discovery_targets = ["192.0.2.100", "192.0.2.101", "192.0.2.102"]
 advertise_ip      = ""              # blank = auto-detect this host's LAN IP
 
 [k4]

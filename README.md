@@ -109,6 +109,11 @@ the cached IP ever stops answering (e.g. DHCP moved it), virtual‑flex re‑res
 the name once via a self‑contained unicast‑mDNS query and reconnects — so DHCP
 installs recover on their own, and reserved‑IP installs never touch DNS at all.
 
+**Unicast discovery (optional):** set `[network] discovery_targets` to your
+Genius boxes' IPs and the discovery packet goes **only to them** — the virtual
+radio disappears from SmartSDR/Maestro pickers entirely. Leave it empty to
+broadcast (the default; required for pairing new boxes the first time).
+
 ## Keying & PTT
 
 LAN keying works for the whole stack, but there's an unavoidable nuance: a real

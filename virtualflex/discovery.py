@@ -1,7 +1,15 @@
 """UDP discovery broadcaster.
 
-Emits a FlexRadio VITA-49 discovery packet at a fixed cadence so the PGXL (and
-SmartSDR, useful for testing) sees the virtual radio and can match its serial.
+Emits a FlexRadio VITA-49 discovery packet at a fixed cadence so the Genius
+boxes see the virtual radio and can match its serial.
+
+Two modes, chosen by ``[network] discovery_targets``:
+- empty (default): broadcast to the subnet — every listener sees us, including
+  SmartSDR/Maestro pickers.
+- a list of IPs: **unicast only to those boxes** (plus any client currently
+  connected to us, so a live box keeps getting refreshed even if the list is
+  stale). The virtual radio becomes invisible to every other picker on the LAN.
+  Pair new boxes in broadcast mode first, then pin their IPs.
 """
 from __future__ import annotations
 
@@ -22,6 +30,19 @@ class DiscoveryBroadcaster:
         self.broadcast_addr = net["broadcast_address"]
         self.port = int(net["discovery_port"])
         self.interval = float(net["discovery_interval"])
+        self.unicast_targets = [str(t).strip() for t in
+                                (net.get("discovery_targets") or []) if str(t).strip()]
+
+    def targets(self) -> list[str]:
+        """Where this cycle's discovery packet goes. Unicast mode augments the
+        configured list with currently-connected client IPs (self-heal)."""
+        if not self.unicast_targets:
+            return [self.broadcast_addr]
+        ips = set(self.unicast_targets)
+        for client in self.radio.clients:
+            if getattr(client, "peer", None):
+                ips.add(client.peer[0])
+        return sorted(ips)
 
     def _payload(self) -> str:
         r = self.radio.config.radio
@@ -88,16 +109,23 @@ class DiscoveryBroadcaster:
         sock.setblocking(False)
         loop = asyncio.get_running_loop()
         count = 0
-        log.info("broadcasting discovery to %s:%d every %.1fs (serial=%s)",
-                 self.broadcast_addr, self.port, self.interval,
-                 self.radio.config.radio["serial"])
+        if self.unicast_targets:
+            log.info("unicasting discovery to %s :%d every %.1fs (serial=%s) - "
+                     "invisible to other pickers on the LAN",
+                     ",".join(self.unicast_targets), self.port, self.interval,
+                     self.radio.config.radio["serial"])
+        else:
+            log.info("broadcasting discovery to %s:%d every %.1fs (serial=%s)",
+                     self.broadcast_addr, self.port, self.interval,
+                     self.radio.config.radio["serial"])
         try:
             while True:
                 pkt = build_discovery_packet(self._payload(), packet_count=count)
-                try:
-                    await loop.sock_sendto(sock, pkt, (self.broadcast_addr, self.port))
-                except OSError as exc:
-                    log.warning("discovery send failed: %s", exc)
+                for addr in self.targets():
+                    try:
+                        await loop.sock_sendto(sock, pkt, (addr, self.port))
+                    except OSError as exc:
+                        log.warning("discovery send to %s failed: %s", addr, exc)
                 count = (count + 1) & 0xF
                 await asyncio.sleep(self.interval)
         finally:
