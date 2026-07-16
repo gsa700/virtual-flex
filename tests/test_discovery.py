@@ -28,17 +28,17 @@ def _radio(**network_overrides):
 
 
 def test_default_is_broadcast():
-    radio = _radio(broadcast_address="10.0.1.255")
+    radio = _radio(broadcast_address="192.0.2.255")
     d = DiscoveryBroadcaster(radio)
-    assert d.targets() == ["10.0.1.255"]
+    assert d.targets() == ["192.0.2.255"]
 
 
 def test_unicast_targets_replace_broadcast():
-    radio = _radio(broadcast_address="10.0.1.255",
+    radio = _radio(broadcast_address="192.0.2.255",
                    discovery_targets=["192.0.2.100", "192.0.2.101"])
     d = DiscoveryBroadcaster(radio)
     assert d.targets() == ["192.0.2.100", "192.0.2.101"]
-    assert "10.0.1.255" not in d.targets()          # nothing broadcast
+    assert "192.0.2.255" not in d.targets()          # nothing broadcast
 
 
 def test_unicast_includes_connected_clients():

@@ -117,7 +117,7 @@ async def scan_for_genius(local_ip: str, *, ports: dict[int, str] | None = None,
 
 def subnet_broadcast(ip: str) -> str:
     """Best-effort /24 subnet-directed broadcast for an IPv4 (192.0.2.14 ->
-    10.0.1.255). The user can override at the prompt for other prefix lengths."""
+    192.0.2.255). The user can override at the prompt for other prefix lengths."""
     parts = ip.split(".")
     if len(parts) == 4 and all(p.isdigit() for p in parts):
         return ".".join(parts[:3] + ["255"])

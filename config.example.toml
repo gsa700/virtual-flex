@@ -17,11 +17,11 @@ broadcast_address = "10.0.1.255"   # subnet-directed broadcast; the host must sh
 # Unicast discovery: list your Genius boxes' IPs and discovery goes ONLY to them —
 # the virtual radio disappears from SmartSDR/Maestro pickers entirely. Leave empty
 # (or omit) to broadcast. Pair new boxes in broadcast mode first, then pin IPs here.
-# discovery_targets = ["192.0.2.100", "192.0.2.101", "192.0.2.102"]
+# discovery_targets = ["10.0.1.*", "10.0.1.*", "10.0.1.*"]
 advertise_ip      = ""              # blank = auto-detect this host's LAN IP
 
 [k4]
-ip        = "192.0.2.105"            # cached address; self-refreshed via mDNS if it stops answering
+ip        = "10.0.1.*"            # cached address; self-refreshed via mDNS if it stops answering
 hostname  = "K4-SN01234.local"     # identity (pins the serial) + mDNS IP-refresh source
 cat_port  = 9200
 ptt_interval  = 0.003              # fast TQX poll for low-latency keying
