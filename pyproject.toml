@@ -1,6 +1,6 @@
 [project]
 name = "virtual-flex"
-version = "0.3.4"
+version = "0.3.5"
 description = "A virtual FlexRadio: lets an Elecraft K4/K4D drive the 4O3A PGXL/TGXL/AGXL stack over the LAN as if it were a FLEX-8600."
 readme = "README.md"
 requires-python = ">=3.11"

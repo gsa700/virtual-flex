@@ -190,8 +190,10 @@ def run(argv: list[str] | None = None) -> int:
         print(f"(pre-filled from {path} — Enter keeps the current value)\n")
 
     # --- locate the K4 ---
-    serial_in = _prompt("K4 serial (the digits in K4-SN..., blank to scan the network)",
-                        k4_serial_from_hostname(str(ex_k4.get("hostname", ""))))
+    k4_default = k4_serial_from_hostname(str(ex_k4.get("hostname", "")))
+    if not k4_default:
+        print("[Press Enter to scan the network for K4s]")
+    serial_in = _prompt("K4 serial (the digits in K4-SN...)", k4_default)
     serial_in = normalize_k4_serial(serial_in)
     k4_hostname = k4_ip = ""
     if serial_in:
