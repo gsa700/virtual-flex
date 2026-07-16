@@ -1,7 +1,10 @@
+import pathlib
+import tempfile
 import tomllib
 
 from virtualflex.config import Config
-from virtualflex.setup import build_config, subnet_broadcast
+from virtualflex.setup import (build_config, k4_serial_from_hostname,
+                               load_existing, subnet_broadcast)
 
 
 def test_subnet_broadcast_slash24():
@@ -21,6 +24,36 @@ def test_build_config_is_valid_toml_with_choices():
     assert data["k4"]["ip"] == "192.0.2.105"
     assert data["radio"]["serial"] == "8600-0000-0000-1234"
     assert data["network"]["broadcast_address"] == "10.0.1.255"
+
+
+def test_k4_serial_from_hostname():
+    assert k4_serial_from_hostname("K4-SN01234.local") == "01234"
+    assert k4_serial_from_hostname("k4-sn01234.LOCAL") == "01234"   # any case
+    assert k4_serial_from_hostname("someother.local") == ""
+    assert k4_serial_from_hostname("") == ""
+
+
+def test_load_existing_roundtrips_a_generated_config():
+    # Re-running setup pre-fills from the previous run's file.
+    cfg = build_config(k4_ip="192.0.2.105", k4_hostname="K4-SN01234.local",
+                       serial="8600-0000-0000-1234", callsign="AB0R",
+                       nickname="VirtualFlex", broadcast="10.0.1.255",
+                       discovery_targets=["192.0.2.100", "192.0.2.101"])
+    with tempfile.TemporaryDirectory() as tmp:
+        p = pathlib.Path(tmp) / "config.toml"
+        p.write_text(cfg)
+        existing = load_existing(p)
+    assert existing["radio"]["callsign"] == "AB0R"
+    assert existing["network"]["discovery_targets"] == ["192.0.2.100", "192.0.2.101"]
+    assert k4_serial_from_hostname(existing["k4"]["hostname"]) == "01234"
+
+
+def test_load_existing_tolerates_missing_or_bad_file():
+    assert load_existing(pathlib.Path("/nonexistent/config.toml")) == {}
+    with tempfile.TemporaryDirectory() as tmp:
+        p = pathlib.Path(tmp) / "config.toml"
+        p.write_text("not [valid toml ===")
+        assert load_existing(p) == {}               # fresh-install behavior
 
 
 def test_build_config_merges_with_defaults():

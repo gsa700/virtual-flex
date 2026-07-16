@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 from . import mdns
@@ -23,6 +25,23 @@ from .config import derive_flex_serial, detect_local_ip
 CONFIG_PATH = "/etc/virtual-flex/config.toml"
 _MODEL = "FLEX-8600"
 _VERSION = "4.2.20.41343"
+
+
+def load_existing(path: Path) -> dict:
+    """Previous config, if any — re-running setup pre-fills prompts from it, so
+    changing one setting (e.g. adding unicast targets) doesn't mean retyping
+    everything."""
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def k4_serial_from_hostname(hostname: str) -> str:
+    """'K4-SN01234.local' -> '01234' (the wizard's first prompt's default)."""
+    m = re.match(r"K4-SN(.+?)\.local$", hostname.strip(), re.IGNORECASE)
+    return m.group(1) if m else ""
 
 
 def subnet_broadcast(ip: str) -> str:
@@ -91,9 +110,17 @@ async def _resolve(hostname: str) -> str | None:
 def run(argv: list[str] | None = None) -> int:
     print("=== virtual-flex setup ===\n")
     local_ip = detect_local_ip()
+    path = Path(os.environ.get("VIRTUALFLEX_CONFIG", CONFIG_PATH))
+    existing = load_existing(path)
+    ex_radio = existing.get("radio", {})
+    ex_net = existing.get("network", {})
+    ex_k4 = existing.get("k4", {})
+    if existing:
+        print(f"(pre-filled from {path} — Enter keeps the current value)\n")
 
     # --- locate the K4 ---
-    serial_in = _prompt("K4 serial (the digits in K4-SN..., blank to enter an IP instead)")
+    serial_in = _prompt("K4 serial (the digits in K4-SN..., blank to enter an IP instead)",
+                        k4_serial_from_hostname(str(ex_k4.get("hostname", ""))))
     k4_hostname = k4_ip = ""
     if serial_in:
         k4_hostname = f"K4-SN{serial_in}.local"
@@ -103,31 +130,37 @@ def run(argv: list[str] | None = None) -> int:
             print(f"  found the K4 at {k4_ip}")
         else:
             print("  no mDNS answer (K4 off, or on another subnet)")
-            k4_ip = _prompt("  K4 IP address")
+            k4_ip = _prompt("  K4 IP address", str(ex_k4.get("ip", "")))
     else:
-        k4_ip = _prompt("K4 IP address")
-        k4_hostname = _prompt("K4 hostname for IP self-heal (optional, e.g. K4-SN01234.local)")
+        k4_ip = _prompt("K4 IP address", str(ex_k4.get("ip", "")))
+        k4_hostname = _prompt("K4 hostname for IP self-heal (optional, e.g. K4-SN01234.local)",
+                              str(ex_k4.get("hostname", "")))
     if not k4_ip and not k4_hostname:
         print("\nNeed at least a K4 IP or hostname — nothing written.")
         return 1
 
     # --- identity + network ---
     derived = derive_flex_serial(_MODEL, k4_hostname) if k4_hostname else None
-    serial = _prompt("Flex serial to advertise (pinned)", derived or "0000-0000-0000-0000")
-    callsign = _prompt("Your callsign")
-    nickname = _prompt("Radio nickname shown in the apps", "VirtualFlex")
-    broadcast = _prompt("LAN broadcast address", subnet_broadcast(local_ip))
+    serial = _prompt("Flex serial to advertise (pinned)",
+                     str(ex_radio.get("serial", "")) or derived or "0000-0000-0000-0000")
+    callsign = _prompt("Your callsign", str(ex_radio.get("callsign", "")))
+    nickname = _prompt("Radio nickname shown in the apps",
+                       str(ex_radio.get("nickname", "")) or "VirtualFlex")
+    broadcast = _prompt("LAN broadcast address",
+                        str(ex_net.get("broadcast_address", "")) or subnet_broadcast(local_ip))
     print("\nDiscovery: broadcast reaches every picker on the LAN (SmartSDR/Maestro"
           "\nwill list this virtual radio). Unicast sends ONLY to your Genius boxes"
           "\n- invisible to everything else. Pair the boxes in broadcast mode first.")
-    targets_in = _prompt("Genius box IPs for unicast (comma-separated, blank = broadcast)")
+    targets_default = ", ".join(str(t) for t in ex_net.get("discovery_targets", []) or [])
+    targets_in = _prompt("Genius box IPs for unicast (comma-separated; blank = broadcast; "
+                         "'none' clears)", targets_default)
+    if targets_in.strip().lower() in ("none", "broadcast"):
+        targets_in = ""
     discovery_targets = [t.strip() for t in targets_in.split(",") if t.strip()]
 
     cfg = build_config(k4_ip=k4_ip, k4_hostname=k4_hostname, serial=serial,
                        callsign=callsign, nickname=nickname, broadcast=broadcast,
                        discovery_targets=discovery_targets)
-
-    path = Path(os.environ.get("VIRTUALFLEX_CONFIG", CONFIG_PATH))
     print(f"\n--- {path} ---\n{cfg}")
     if not _yes("Write this config?", default_no=False):
         print("Aborted; nothing written.")
