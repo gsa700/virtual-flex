@@ -44,9 +44,13 @@ class DiscoveryBroadcaster:
             f"callsign={r['callsign']}",
             f"ip={ip}",
             f"port={port}",
-            "status=Available",
-            "inuse_ip=",
-            "inuse_host=",
+            # EXPERIMENT: advertise as In_Use (with the v2-era inuse_* fields
+            # populated) so GUI pickers show a seated radio instead of
+            # "Available (MultiFLEX)". Revert to status=Available if any Genius
+            # box turns out to gate pairing on this field.
+            "status=In_Use",
+            f"inuse_ip={ip}",
+            "inuse_host=virtualflex",
             "max_licensed_version=v3",
             "radio_license_id=00-1C-2D-00-08-95",
             "fpc_mac=00:1c:2d:00:08:95",
