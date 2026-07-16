@@ -25,7 +25,8 @@ command -v dpkg-deb >/dev/null || { echo "dpkg-deb not found (apt install dpkg)"
 
 STAGE="$(mktemp -d)/${PKG}_${VERSION}_${ARCH}"
 mkdir -p "$STAGE/DEBIAN" "$STAGE/usr/lib/virtual-flex" "$STAGE/lib/systemd/system" \
-         "$STAGE/usr/bin" "$STAGE/usr/share/doc/virtual-flex"
+         "$STAGE/usr/bin" "$STAGE/usr/share/doc/virtual-flex" \
+         "$STAGE/usr/share/man/man1"
 
 # --- payload ---
 cp -r "${REPO_DIR}/virtualflex" "$STAGE/usr/lib/virtual-flex/"
@@ -33,6 +34,7 @@ find "$STAGE/usr/lib/virtual-flex" -name '__pycache__' -type d -prune -exec rm -
 cp "${PKG_DIR}/virtual-flex.service" "$STAGE/lib/systemd/system/"
 cp "${REPO_DIR}/config.example.toml" "$STAGE/usr/share/doc/virtual-flex/"
 cp "${REPO_DIR}/README.md" "$STAGE/usr/share/doc/virtual-flex/"
+gzip -9n < "${PKG_DIR}/virtual-flex.1" > "$STAGE/usr/share/man/man1/virtual-flex.1.gz"
 
 # --- /usr/bin/virtual-flex wrapper (so `virtual-flex setup` etc. work on PATH) ---
 cat > "$STAGE/usr/bin/virtual-flex" <<'EOF'

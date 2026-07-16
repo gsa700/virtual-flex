@@ -23,7 +23,18 @@ log = logging.getLogger("virtualflex")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="virtual-flex", description=__doc__)
+    p = argparse.ArgumentParser(
+        prog="virtual-flex",
+        description="A virtual FlexRadio: an Elecraft K4/K4D drives the 4O3A "
+                    "PGXL/TGXL/AGXL stack over the LAN as if it were a FLEX-8600. "
+                    "With no command, runs the bridge daemon.",
+        epilog=("commands:\n"
+                "  setup             interactive wizard: scans for the K4 and the Genius\n"
+                "                    boxes, writes /etc/virtual-flex/config.toml, starts\n"
+                "                    the service (run with sudo)\n"
+                "  update [--check]  install the latest release from GitHub, restarting\n"
+                "                    the service if it was running (--check only reports)\n"),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("-c", "--config", help="path to config.toml")
     p.add_argument("--host", default="0.0.0.0", help="bind address for the command server")
     p.add_argument("--log-level", default="INFO",
