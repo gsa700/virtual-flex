@@ -34,7 +34,7 @@ _DEFAULTS: dict = {
         "hostname": "",            # K4-SN<serial>.local — identity + mDNS refresh
         "cat_port": 9200,
         "ptt_interval": 0.003,     # fast TQX poll for low-latency keying
-        "freq_interval": 0.1,      # FA/FB/FT/MD poll
+        "freq_interval": 2.0,      # FA/FB/FT/MD resync poll (AI2 pushes are the fast path)
         "stale_after": 3.0,        # no valid response for this long => "absent"
     },
     "presence": {

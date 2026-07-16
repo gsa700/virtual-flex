@@ -1,9 +1,14 @@
 """Native Elecraft K4/K4D network-CAT client.
 
-A single connection to the K4's CAT port (9200). Fast-polls ``TQX`` for
-low-latency PTT and periodically reads ``FA/FB/FT/MD`` for the transmit
-frequency and mode. In split (``FT=1``) the transmit VFO is B, so the stack must
-follow ``FB``; otherwise ``FA``.
+A single connection to the K4's CAT port (9200). Enables auto-info (``AI2``) so
+the K4 **pushes** ``FA/FB/FT/MD`` changes the instant they happen — dial spins
+reach the stack event-driven, like a real Flex — with a slow poll kept only as
+a resync fallback. PTT stays on the fast ``TQX`` poll (its latency floor is the
+poll, and it must never depend on the push path). In split (``FT=1``) the
+transmit VFO is B, so the stack must follow ``FB``; otherwise ``FA``.
+
+AI state is per-connection on the K4, so ``AI2`` here never affects a logger's
+own CAT session, and a reconnect re-arms it.
 
 The K4 is addressed by IP (no per-connect DNS). If the cached IP stops
 answering, one mDNS lookup relearns it (see :func:`mdns.resolve`) so DHCP
@@ -40,7 +45,7 @@ class K4Client:
     _MDNS_EVERY = 5           # re-resolve the IP every Nth failed try (catch DHCP changes)
 
     def __init__(self, *, ip: str, port: int = 9200, hostname: str | None = None,
-                 ptt_interval: float = 0.003, freq_interval: float = 0.1,
+                 ptt_interval: float = 0.003, freq_interval: float = 2.0,
                  stale_after: float = 3.0,
                  on_tx: TxCallback | None = None,
                  on_ptt: PttCallback | None = None) -> None:
@@ -122,16 +127,19 @@ class K4Client:
             writer.close()
 
     async def _writer_loop(self, writer: asyncio.StreamWriter) -> None:
-        writer.write(b"FA;FB;FT;MD;TQX;")          # initial full read
+        # AI2 arms push mode: the K4 volunteers FA/FB/FT/MD the moment they
+        # change, so frequency follow is event-driven. The periodic FA/FB/FT/MD
+        # below is only a slow RESYNC in case a push is lost or AI is reset.
+        writer.write(b"AI2;FA;FB;FT;MD;TQX;")      # arm push mode + initial full read
         await writer.drain()
         every = max(1, round(self.freq_interval / self.ptt_interval))
         tick = 0
         while True:
             writer.write(b"TQX;")                  # fast PTT poll every cycle
-            if tick % every == 0:
-                writer.write(b"FA;FB;FT;MD;")       # freq/mode less often
-            await writer.drain()
             tick += 1
+            if tick % every == 0:
+                writer.write(b"FA;FB;FT;MD;")       # slow resync (pushes are the fast path)
+            await writer.drain()
             await asyncio.sleep(self.ptt_interval)
 
     async def _reader_loop(self, reader: asyncio.StreamReader) -> None:

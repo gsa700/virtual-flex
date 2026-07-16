@@ -15,6 +15,7 @@ class MockK4:
         self.server = None
         self.port = None
         self.conns = []           # live client writers, so we can simulate power-off
+        self.cmds = []            # every command received (to assert AI2 arming)
 
     async def start(self):
         self.server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
@@ -52,10 +53,16 @@ class MockK4:
                 pass
 
     def _reply(self, writer, cmd):
+        self.cmds.append(cmd)
         table = {"FA": f"FA{self.fa};", "FB": f"FB{self.fb};", "FT": f"FT{self.ft};",
                  "MD": f"MD{self.md};", "TQ": f"TQ{self.tq};", "TQX": f"TQ{self.tq};"}
         if cmd in table:
             writer.write(table[cmd].encode())
+
+    def push(self, stmt: str) -> None:
+        """Send an unsolicited statement to every client (simulates AI2 push)."""
+        for w in self.conns:
+            w.write(stmt.encode())
 
     async def stop(self):
         self.server.close()
@@ -103,6 +110,51 @@ def test_k4_reads_tx_freq_mode_and_ptt():
             if ptt:
                 break
         assert ptt and ptt[-1] is True
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        await srv.stop()
+
+    asyncio.run(scenario())
+
+
+def test_k4_arms_ai2_on_connect():
+    async def scenario():
+        srv = MockK4()
+        await srv.start()
+        tx = []
+        client = K4Client(ip="127.0.0.1", port=srv.port,
+                          on_tx=lambda f, m: tx.append((f, m)))
+        await _run_briefly(client, lambda: bool(tx))
+        assert "AI2" in srv.cmds                    # push mode armed at connect
+        await srv.stop()
+
+    asyncio.run(scenario())
+
+
+def test_k4_unsolicited_push_is_the_fast_path():
+    async def scenario():
+        srv = MockK4()
+        await srv.start()
+        tx = []
+        # freq_interval=60 -> the resync poll cannot fire during the test, so
+        # any update after the initial read MUST come from the pushed statement.
+        client = K4Client(ip="127.0.0.1", port=srv.port, freq_interval=60.0,
+                          on_tx=lambda f, m: tx.append((f, m)))
+        task = asyncio.create_task(client.run())
+        for _ in range(100):                        # initial FA/MD read
+            await asyncio.sleep(0.02)
+            if tx:
+                break
+        assert tx and tx[0] == (14213000, "USB")
+        srv.push("FA00007200000;")                  # dial spin arrives as AI2 push
+        for _ in range(100):
+            await asyncio.sleep(0.02)
+            if len(tx) > 1:
+                break
+        assert tx[-1] == (7200000, "USB")           # emitted with no poll involved
         task.cancel()
         try:
             await task

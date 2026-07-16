@@ -67,8 +67,9 @@ not a dpkg conffile, so upgrades never prompt or clobber it.
 ## Module layout
     __main__.py    entry: `setup` subcommand -> wizard; else load config -> Supervisor
     supervisor.py  presence state machine (present / absent, debounce)
-    k4.py          native K4 CAT client: connect-by-IP, poll FA/FB/FT/MD/TQX,
-                   expose freq/mode/split/ptt; mDNS IP-refresh on failure
+    k4.py          native K4 CAT client: connect-by-IP; AI2 push mode for
+                   FA/FB/FT/MD (event-driven dial follow, slow poll = resync
+                   only), fast TQX poll for PTT; mDNS IP-refresh on failure
     mdns.py        one-shot unicast (QU) mDNS resolver, K4-SN*.local -> IP
     setup.py       `virtual-flex setup` config wizard
     state.py       Flex object model (radio/slice/interlock/transmit)
