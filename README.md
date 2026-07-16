@@ -44,7 +44,11 @@ registration each box performs on connect, and streams the objects they consume
 - `interlock` — the TX state machine `READY → PTT_REQUESTED → TRANSMITTING → UNKEY_REQUESTED → READY`
 
 Everything is sourced **natively from the K4's CAT port over a single socket** —
-`FA/FB/FT/MD` for frequency/mode/split and a fast `TQX` poll for low‑latency PTT.
+auto‑info (`AI2`) makes the K4 **push** `FA/FB/FT/MD` changes the instant they
+happen (frequency/mode/split), with a fast `TQX` poll for low‑latency PTT.
+Runtime updates go out as **terse deltas** (only the changed keys) through a
+**50 ms pacing buffer**, so the stack sees an even, Flex‑like stream instead of
+1 KB dumps — the Genius boxes' embedded parsers can't keep up with the latter.
 A **presence supervisor** owns the lifecycle: while the K4 is reachable it
 advertises and serves the stack; when the K4 goes absent it drops discovery and
 every stack connection, so each 4O3A box reverts to its configured "no

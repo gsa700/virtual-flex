@@ -72,7 +72,11 @@ not a dpkg conffile, so upgrades never prompt or clobber it.
                    only), fast TQX poll for PTT; mDNS IP-refresh on failure
     mdns.py        one-shot unicast (QU) mDNS resolver, K4-SN*.local -> IP
     setup.py       `virtual-flex setup` config wizard
-    state.py       Flex object model (radio/slice/interlock/transmit)
+    update.py      `virtual-flex update` self-updater (GitHub latest release -> apt)
+    state.py       Flex object model (radio/slice/interlock/transmit); runtime
+                   changes emit terse deltas (changed keys only) through a 50 ms
+                   pacing buffer — full dumps only at subscribe/structural changes
+                   (fast-poll hybrid tried live: stale interleaves = jerky follow)
     protocol.py    per-client handshake + Genius command/status dispatch
     server.py      TCP listener (:4992), start/stop with presence
     discovery.py   VITA-49 discovery broadcaster
