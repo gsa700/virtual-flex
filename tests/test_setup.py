@@ -6,7 +6,7 @@ import tomllib
 from virtualflex.config import Config
 from virtualflex.setup import (build_config, k4_serial_from_hostname,
                                load_existing, normalize_k4_serial,
-                               scan_for_k4s, subnet_broadcast)
+                               scan_for_genius, scan_for_k4s, subnet_broadcast)
 
 
 def test_subnet_broadcast_slash24():
@@ -100,6 +100,36 @@ def test_scan_skips_dead_hosts_keeps_silent_listeners():
                                    connect_timeout=0.3)
         srv.close()
         assert found == [("127.0.0.1", "")]           # listener w/o serial kept
+
+    asyncio.run(scenario())
+
+
+def test_scan_finds_genius_boxes_by_port():
+    async def scenario():
+        async def accept(reader, writer):
+            writer.close()
+
+        pg = await asyncio.start_server(accept, "127.0.0.1", 0)
+        tg = await asyncio.start_server(accept, "127.0.0.1", 0)
+        pg_port = pg.sockets[0].getsockname()[1]
+        tg_port = tg.sockets[0].getsockname()[1]
+        found = await scan_for_genius(
+            "127.0.0.1", hosts=["127.0.0.1"],
+            ports={pg_port: "Power Genius XL", tg_port: "Tuner Genius XL"})
+        pg.close()
+        tg.close()
+        assert ("127.0.0.1", "Power Genius XL") in found
+        assert ("127.0.0.1", "Tuner Genius XL") in found
+
+    asyncio.run(scenario())
+
+
+def test_scan_for_genius_empty_when_nothing_listens():
+    async def scenario():
+        found = await scan_for_genius("127.0.0.1", hosts=["127.0.0.2"],
+                                      ports={9008: "Power Genius XL"},
+                                      connect_timeout=0.3)
+        assert found == []
 
     asyncio.run(scenario())
 

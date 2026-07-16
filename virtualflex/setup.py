@@ -85,6 +85,36 @@ async def scan_for_k4s(local_ip: str, *, port: int = 9200,
     return [h for h in hits if h]
 
 
+# 4O3A Genius devices serve their own management APIs on well-known ports —
+# each box announced its port in the `amplifier create` it sends us.
+GENIUS_PORTS = {9007: "Antenna Genius", 9008: "Power Genius XL", 9010: "Tuner Genius XL"}
+
+
+async def scan_for_genius(local_ip: str, *, ports: dict[int, str] | None = None,
+                          connect_timeout: float = 0.6,
+                          hosts: list[str] | None = None) -> list[tuple[str, str]]:
+    """Find 4O3A boxes on the /24 by their management ports. Returns
+    [(ip, label)], one entry per responding box, ordered by IP."""
+    ports = GENIUS_PORTS if ports is None else ports
+    base = local_ip.rsplit(".", 1)[0]
+    if hosts is None:
+        hosts = [f"{base}.{i}" for i in range(1, 255)]
+
+    async def probe(ip: str, port: int, label: str) -> tuple[str, str] | None:
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(ip, port), connect_timeout)
+        except (OSError, asyncio.TimeoutError):
+            return None
+        writer.close()
+        return (ip, label)
+
+    hits = await asyncio.gather(*(probe(ip, port, label)
+                                  for ip in hosts
+                                  for port, label in ports.items()))
+    return sorted(h for h in hits if h)
+
+
 def subnet_broadcast(ip: str) -> str:
     """Best-effort /24 subnet-directed broadcast for an IPv4 (192.0.2.14 ->
     10.0.1.255). The user can override at the prompt for other prefix lengths."""
@@ -213,10 +243,17 @@ def run(argv: list[str] | None = None) -> int:
                         str(ex_net.get("broadcast_address", "")) or subnet_broadcast(local_ip))
     print("\nDiscovery: broadcast reaches every picker on the LAN (SmartSDR/Maestro"
           "\nwill list this virtual radio). Unicast sends ONLY to your Genius boxes"
-          "\n- invisible to everything else. Pair the boxes in broadcast mode first.")
-    targets_default = ", ".join(str(t) for t in ex_net.get("discovery_targets", []) or [])
-    targets_in = _prompt("Genius box IPs for unicast (comma-separated; blank = broadcast; "
-                         "'none' clears)", targets_default)
+          "\n- invisible to everything else.")
+    print(f"  scanning {local_ip.rsplit('.', 1)[0]}.0/24 for 4O3A Genius devices ...")
+    genius = asyncio.run(scan_for_genius(local_ip))
+    for ip, label in genius:
+        print(f"  found {label} at {ip}")
+    if not genius:
+        print("  none found (boxes off, or another subnet)")
+    targets_default = (", ".join(ip for ip, _ in genius)
+                       or ", ".join(str(t) for t in ex_net.get("discovery_targets", []) or []))
+    targets_in = _prompt("Genius box IPs for unicast (comma-separated; "
+                         "'none' = broadcast to the whole subnet)", targets_default)
     if targets_in.strip().lower() in ("none", "broadcast"):
         targets_in = ""
     discovery_targets = [t.strip() for t in targets_in.split(",") if t.strip()]
