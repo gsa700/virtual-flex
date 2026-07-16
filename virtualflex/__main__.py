@@ -103,6 +103,9 @@ def main(argv: list[str] | None = None) -> None:
     if argv and argv[0] == "setup":
         from . import setup
         raise SystemExit(setup.run(argv[1:]))
+    if argv and argv[0] == "update":
+        from . import update
+        raise SystemExit(update.run(argv[1:]))
     args = parse_args(argv)
     logging.basicConfig(
         level=getattr(logging, args.log_level),

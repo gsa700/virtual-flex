@@ -12,6 +12,12 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="${REPO_DIR}/deploy/pkg"
 VERSION="${1:-$(sed -nE 's/^version *= *"([^"]+)".*/\1/p' "${REPO_DIR}/pyproject.toml" | head -1)}"
 [ -n "$VERSION" ] || { echo "could not determine version"; exit 1; }
+
+# __version__ must match: the self-updater compares GitHub tags against it,
+# and a stale constant makes `virtual-flex update` reinstall forever.
+PKG_VERSION="$(sed -nE 's/^__version__ *= *"([^"]+)".*/\1/p' "${REPO_DIR}/virtualflex/__init__.py" | head -1)"
+[ "$PKG_VERSION" = "$VERSION" ] || {
+  echo "version mismatch: pyproject=$VERSION but virtualflex/__init__.py=$PKG_VERSION"; exit 1; }
 PKG=virtual-flex
 ARCH=all
 

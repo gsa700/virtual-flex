@@ -75,6 +75,16 @@ no TOML editing. Then pair the 4O3A boxes to the serial it prints.
 
 Watch it: `journalctl -u virtual-flex -f`.
 
+### Updating
+
+```bash
+sudo virtual-flex update            # fetch + install the latest release, restart if running
+virtual-flex update --check         # just report whether an update exists
+```
+
+Your config is untouched by updates (it's generated, not packaged), and the
+service is only restarted if it was already running.
+
 ## Run from source (dev / other platforms)
 
 ```bash

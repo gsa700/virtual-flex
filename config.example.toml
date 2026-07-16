@@ -21,7 +21,7 @@ ip        = "192.0.2.105"            # cached address; self-refreshed via mDNS i
 hostname  = "K4-SN01234.local"     # identity (pins the serial) + mDNS IP-refresh source
 cat_port  = 9200
 ptt_interval  = 0.003              # fast TQX poll for low-latency keying
-freq_interval = 0.1                # FA/FB/FT/MD poll alongside AI2 pushes (hybrid = densest dial follow)
+freq_interval = 60                 # FA/FB/FT/MD slow resync; AI2 pushes carry dial changes (fast poll = jerky)
 stale_after   = 3.0                # no valid CAT response for this long => treat the K4 as absent
 
 [presence]

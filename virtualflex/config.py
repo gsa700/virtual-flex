@@ -34,9 +34,9 @@ _DEFAULTS: dict = {
         "hostname": "",            # K4-SN<serial>.local — identity + mDNS refresh
         "cat_port": 9200,
         "ptt_interval": 0.003,     # fast TQX poll for low-latency keying
-        "freq_interval": 0.1,      # FA/FB/FT/MD poll, run ALONGSIDE AI2 pushes: the K4
-                                   # answers polls mid-spin more readily than it pushes,
-                                   # so the hybrid gives the densest dial follow (verified live)
+        "freq_interval": 60.0,     # FA/FB/FT/MD slow RESYNC only — AI2 pushes are the data
+                                   # path. A fast poll alongside pushes was tried live and
+                                   # made the follow jerky (stale samples between fresh pushes)
         "stale_after": 3.0,        # no valid response for this long => "absent"
     },
     "presence": {
