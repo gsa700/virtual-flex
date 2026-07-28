@@ -1,5 +1,6 @@
-# virtual-flex v0.2 configuration.
-# Copy to config.toml and edit. v0.2 is K4-only and native — no hamlib/rigctld.
+# virtual-flex configuration. Addresses below are RFC 5737 documentation
+# examples (192.0.2.0/24) — replace them with your own.
+# Copy to config.toml and edit. K4-only and native — no hamlib/rigctld.
 # (The install wizard will write this for you; shown here for manual/dev use.)
 # Run with:  python -m virtualflex --config config.toml
 
@@ -13,15 +14,15 @@ callsign = "AB0R"
 [network]
 command_port      = 4992
 discovery_port    = 4992
-broadcast_address = "10.0.1.255"   # subnet-directed broadcast; the host must share the stack's subnet
+broadcast_address = "192.0.2.255"  # subnet-directed broadcast; the host must share the stack's subnet
 # Unicast discovery: list your Genius boxes' IPs and discovery goes ONLY to them —
 # the virtual radio disappears from SmartSDR/Maestro pickers entirely. Leave empty
 # (or omit) to broadcast. Pair new boxes in broadcast mode first, then pin IPs here.
-# discovery_targets = ["10.0.1.*", "10.0.1.*", "10.0.1.*"]
+# discovery_targets = ["192.0.2.100", "192.0.2.101", "192.0.2.102"]
 advertise_ip      = ""              # blank = auto-detect this host's LAN IP
 
 [k4]
-ip        = "10.0.1.*"            # cached address; self-refreshed via mDNS if it stops answering
+ip        = "192.0.2.105"          # cached address; self-refreshed via mDNS if it stops answering
 hostname  = "K4-SN01234.local"     # identity (pins the serial) + mDNS IP-refresh source
 cat_port  = 9200
 ptt_interval  = 0.003              # fast TQX poll for low-latency keying
