@@ -15,7 +15,7 @@ no hamlib.
 
 ## Status: working
 
-Current release **v0.3.8**, validated end‑to‑end against a real K4D **and** a real
+Current release **v0.5.0**, validated end‑to‑end against a real K4D **and** a real
 4O3A PGXL/TGXL/AGXL stack (cross‑checked against a genuine FLEX‑8600) — including
 a clean install from a bare Debian image:
 
