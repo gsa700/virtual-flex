@@ -15,7 +15,7 @@ no hamlib.
 
 ## Status: working
 
-Shipped as **v0.2.0** and validated end‑to‑end against a real K4D **and** a real
+Current release **v0.3.7**, validated end‑to‑end against a real K4D **and** a real
 4O3A PGXL/TGXL/AGXL stack (cross‑checked against a genuine FLEX‑8600) — including
 a clean install from a bare Debian image:
 
@@ -31,6 +31,10 @@ a clean install from a bare Debian image:
   seconds; in on‑air use it's indistinguishable from a real FLEX‑8600 coming back.
 - **Quiet on the network** — one CAT socket to the K4, addressed by IP, so
   steady‑state DNS traffic is zero (no repeated `.local` lookups).
+
+The v0.3 line leaves that runtime path untouched and builds out everything
+around it: unicast discovery, a setup wizard that scans for the K4 and the
+Genius boxes, `virtual-flex update`, and a man page.
 
 ## How it works
 
