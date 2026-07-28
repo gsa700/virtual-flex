@@ -1,6 +1,6 @@
 # virtual-flex — architecture
 
-*Current release: v0.3.7.* The tightest, most transparent Elecraft **K4/K4D ↔
+*Current release: v0.3.8.* The tightest, most transparent Elecraft **K4/K4D ↔
 FlexRadio** integration for the 4O3A Genius stack (PGXL / TGXL / AGXL). Pure K4.
 **No hamlib, no rigctld, no external rig dependency.** Support for other radios
 would live in separate forks of this codebase, not behind abstraction layers here.
