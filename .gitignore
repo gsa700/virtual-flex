@@ -6,6 +6,9 @@ venv/
 .env
 /config.toml
 
+/virtual-flex-blog-post.html
+/virtual-flex-diagram.svg
+
 *.pcap
 *.pcapng
 .pytest_cache/
